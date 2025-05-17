@@ -1,0 +1,224 @@
+<!--  ==== COMMUNITY CHAT (PocketBase + Tailwind) ====  -->
+<div id="pb-chat" style="min-height:600px"></div>
+
+<!-- Tailwind ─ loads instantly from the official CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script type="module">
+/* ----------------------------------------------------
+   CONFIGURATION
+---------------------------------------------------- */
+import PocketBase   from "https://cdn.jsdelivr.net/npm/pocketbase@0.22.5/+esm";
+import { html,render } from "https://cdn.jsdelivr.net/npm/lit-html@3.1.3/+esm";
+
+const PB_URL = "YOUR_POCKETBASE_URL_HERE";          //  ← change me
+const pb     = new PocketBase(PB_URL);
+
+/* ----------------------------------------------------
+   STATE  /  SIMPLE STORE
+---------------------------------------------------- */
+const state = {
+  user     : pb.authStore.model,
+  channels : [],
+  current  : null,
+  messages : [],
+  msgSub   : null
+};
+const setState = (obj)=>{ Object.assign(state,obj); draw(); };
+
+/* ----------------------------------------------------
+   RENDER LOOP
+---------------------------------------------------- */
+function draw(){ render(state.user ? chatUI() : authUI(),
+                        document.getElementById("pb-chat")); }
+
+/* ---------- AUTH SCREENS ---------- */
+function authUI(){
+  return html`
+  <div class="max-w-md mx-auto my-12 p-6 bg-white rounded-xl shadow">
+    <h2 class="text-xl font-semibold mb-4 text-center">Member Login</h2>
+    <form @submit=${loginEmail} class="space-y-3">
+      <input name="email"    type="email"    placeholder="Email"
+             required class="w-full p-2 border rounded">
+      <input name="password" type="password" placeholder="Password"
+             required class="w-full p-2 border rounded">
+      <button class="w-full py-2 bg-indigo-600 text-white rounded">Log&nbsp;in</button>
+    </form>
+    <p class="text-sm text-center mt-4">
+      No account?
+      <a @click=${()=>setState({showSignup:true})}
+         class="text-indigo-600 cursor-pointer">Sign up</a>
+    </p>
+    ${state.showSignup ? signupForm() : ""}
+  </div>`; }
+
+function signupForm(){ return html`
+  <form @submit=${signupEmail} class="space-y-3 mt-4 border-t pt-4">
+    <input name="name"     placeholder="Display name" required
+           class="w-full p-2 border rounded">
+    <input name="email"    type="email"    placeholder="Email"    required
+           class="w-full p-2 border rounded">
+    <input name="password" type="password" placeholder="Password" required
+           class="w-full p-2 border rounded">
+    <button class="w-full py-2 bg-green-600 text-white rounded">
+      Create&nbsp;account
+    </button>
+  </form>`; }
+
+async function loginEmail(e){
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  await pb.collection("users").authWithPassword(f.email,f.password);
+  setState({user:pb.authStore.model,showSignup:false});
+  loadChannels();
+}
+async function signupEmail(e){
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  await pb.collection("users").create({
+    email:f.email,password:f.password,passwordConfirm:f.password,
+    displayName:f.name,role:"member"
+  });
+  await loginEmail({preventDefault(){},target:e.target});
+}
+
+/* ---------- CHAT SCREENS ---------- */
+function chatUI(){
+  return html`
+  <div class="flex h-[600px] border rounded overflow-hidden bg-gray-50">
+    <!-- channels -->
+    <aside class="w-56 bg-gray-100 border-r overflow-y-auto">
+      <header class="p-3 font-semibold flex justify-between items-center">
+        Channels
+        ${isMod()? html`<button @click=${createChannel}>+</button>` : ""}
+      </header>
+      ${state.channels.map(c=>html`
+        <div @click=${()=>switchChannel(c)}
+             class="p-3 cursor-pointer ${state.current?.id===c.id?'bg-white font-semibold':''}">
+          # ${c.name}
+        </div>`)}
+    </aside>
+
+    <!-- messages + composer -->
+    <main class="flex-1 flex flex-col">
+      <header class="p-3 border-b bg-white font-semibold">
+        ${state.current ? `#${state.current.name}` : "select a channel"}
+        <button @click=${logout}
+                class="float-right text-red-600 text-sm">Log&nbsp;out</button>
+      </header>
+
+      <section id="msgwrap" class="flex-1 p-4 overflow-y-auto space-y-3 bg-white">
+        ${state.messages.filter(m=>m.pinned).map(renderMsg)}
+        ${state.messages.filter(m=>!m.pinned).map(renderMsg)}
+      </section>
+
+      ${state.current ? msgComposer() : ""}
+    </main>
+  </div>`; }
+
+function renderMsg(m){
+  const you = m.author.id === state.user.id;
+  const roleIcon = m.author.role==="admin"?"★":m.author.role==="moderator"?"☆":"";
+  return html`
+  <article class="flex gap-3" id="m-${m.id}">
+    <img class="w-10 h-10 rounded-full"
+         src="${PB_URL}/api/files/_pb_users_auth_/${m.author.id}/${m.author.avatar}?thumb=64x64">
+    <div class="flex-1">
+      <header class="text-sm mb-1">
+        <span class="font-semibold">${m.author.displayName}</span>
+        ${roleIcon?html`<span class="ml-1 text-xs">${roleIcon}</span>`:""}
+        <time class="ml-2 text-gray-500 text-xs">${new Date(m.created).toLocaleString()}</time>
+        ${(isMod()||you)
+          ? html`<button @click=${()=>delMsg(m)}
+                   class="ml-2 text-red-600 text-xs">Delete</button>` : ""}
+        ${isMod()
+          ? html`<button @click=${()=>pinMsg(m)}
+                   class="ml-2 text-xs">${m.pinned?'Unpin':'Pin'}</button>` : ""}
+      </header>
+      ${m.text?    html`<p class="whitespace-pre-wrap">${m.text}</p>`:""}
+      ${m.image?   html`<img class="max-w-xs rounded mt-2"
+                       src="${PB_URL}/api/files/messages/${m.id}/${m.image}?thumb=640x640">`:""}
+    </div>
+  </article>`; }
+
+function msgComposer(){ return html`
+  <form @submit=${sendMsg} class="flex gap-3 border-t p-3 bg-gray-50">
+    <input name="text" placeholder="Message…" autocomplete="off"
+           class="flex-1 p-2 border rounded">
+    <input name="image" type="file" accept="image/*" class="hidden">
+    <button type="button"
+            @click=${e=>e.target.previousElementSibling.click()}>📷</button>
+    <button class="px-4 py-2 bg-indigo-600 text-white rounded">Send</button>
+  </form>`; }
+
+/* ---------- ACTIONS ---------- */
+async function createChannel(){
+  const name = prompt("Channel name (no spaces)");
+  if(!name) return;
+  const chan = await pb.collection("channels").create({name,createdBy:state.user.id});
+  setState({channels:[...state.channels,chan]});
+}
+function switchChannel(c){
+  if(state.current?.id===c.id) return;
+  if(state.msgSub) state.msgSub();
+  setState({current:c,messages:[]});
+  loadMessages(c.id);
+}
+async function sendMsg(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const data={
+    channel:state.current.id,
+    author :state.user.id,
+    text   :fd.get("text"),
+    image  :fd.get("image").size?fd.get("image"):undefined
+  };
+  await pb.collection("messages").create(data);
+  e.target.reset();
+}
+async function delMsg(m){ if(confirm("Delete message?"))
+  await pb.collection("messages").delete(m.id); }
+async function pinMsg(m){
+  await pb.collection("messages").update(m.id,{pinned:!m.pinned});
+}
+function logout(){
+  pb.authStore.clear();
+  setState({user:null,channels:[],current:null,messages:[]});
+}
+const isMod = ()=>["moderator","admin"].includes(state.user?.role);
+
+/* ---------- DATA LOADERS ---------- */
+async function loadChannels(){
+  const list = await pb.collection("channels").getFullList({sort:"name"});
+  setState({channels:list});
+  if(list.length) switchChannel(list[0]);
+}
+async function loadMessages(channelId){
+  const list = await pb.collection("messages").getFullList({
+    filter:`channel='${channelId}'`,
+    expand:"author",
+    sort:"pinned DESC, created"
+  });
+  setState({messages:list});
+  subscribeMessages(channelId);
+  setTimeout(()=>document.getElementById("msgwrap").scrollTop=9e9);
+}
+function subscribeMessages(channelId){
+  state.msgSub = pb.collection("messages")
+    .subscribe(`channel='${channelId}'`, ev=>{
+      if(ev.action==="create"){ state.messages.push(ev.record); }
+      else if(ev.action==="update"){
+        const i=state.messages.findIndex(x=>x.id===ev.record.id);
+        if(i>-1) state.messages[i]=ev.record;
+      }else if(ev.action==="delete"){
+        state.messages = state.messages.filter(x=>x.id!==ev.record.id);
+      }
+      draw();
+  });
+}
+
+/* ---------- INIT ---------- */
+if(state.user) loadChannels();
+draw();
+</script>
+<!--  ================================================  -->
