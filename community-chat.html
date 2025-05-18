@@ -167,19 +167,25 @@ function switchChannel(c){
 }
 async function sendMsg(e){
   e.preventDefault();
-  const fd = new FormData(e.target);
+  const fd = new FormData(e.target);          // keep the raw FormData
 
-  const data = {
-    channel : state.current.id,
-    author  : state.user.id,
-    text    : fd.get("text"),
-    image   : fd.get("image").size ? fd.get("image") : undefined
-  };
+  // required relational fields must be sent as text parts
+  fd.set("channel", state.current.id);
+  fd.set("author",  state.user.id);
 
-  await pb.collection("messages").create(data);   // just create; SSE will add it
+  // if no text entered remove the empty “text” part
+  if (!fd.get("text").trim()) fd.delete("text");
 
+  // if no image chosen remove the empty “image” part
+  if (!fd.get("image") || fd.get("image").size === 0) fd.delete("image");
+
+  // create the record (SDK will send multipart/form-data automatically)
+  await pb.collection("messages").create(fd, { expand: "author" });
+
+  // the realtime event will add it to the list; just reset the form
   e.target.reset();
 }
+
    
 async function delMsg(m){ if(confirm("Delete message?"))
   await pb.collection("messages").delete(m.id); }
