@@ -218,18 +218,24 @@ async function loadMessages(channelId){
   setTimeout(()=>document.getElementById("msgwrap").scrollTop=9e9);
 }
 function subscribeMessages(channelId){
-  state.msgSub = pb.collection("messages")
-  .subscribe(`channel='${channelId}'`, ev => {
-    if (ev.action === "create") {
-      state.messages.push(ev.record);      // events *from other users*
-    } else if (ev.action === "update") {
-      const i = state.messages.findIndex(x => x.id === ev.record.id);
-      if (i > -1) state.messages[i] = ev.record;
-    } else if (ev.action === "delete") {
-      state.messages = state.messages.filter(x => x.id !== ev.record.id);
+  state.msgSub = pb.collection("messages").subscribe(
+    "*",                           // listen to the whole collection
+    ev => {
+      if (ev.action === "create") {
+        state.messages.push(ev.record);
+      } else if (ev.action === "update") {
+        const i = state.messages.findIndex(x => x.id === ev.record.id);
+        if (i > -1) state.messages[i] = ev.record;
+      } else if (ev.action === "delete") {
+        state.messages = state.messages.filter(x => x.id !== ev.record.id);
+      }
+      draw();
+    },
+    {                                // ← options object
+      filter : `channel='${channelId}'`,
+      expand : "author"
     }
-    draw();
-  }, { expand: "author" });
+  );
 }
 
 
