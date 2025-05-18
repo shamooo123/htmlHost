@@ -168,12 +168,15 @@ function switchChannel(c){
 async function sendMsg(e){
   e.preventDefault();
   const fd = new FormData(e.target);
-  const data={
-    channel:state.current.id,
-    author :state.user.id,
-    text   :fd.get("text"),
-    image  :fd.get("image").size?fd.get("image"):undefined
+  const data = {
+    channel : state.current.id,
+    author  : state.user.id,
+    text    : fd.get("text"),
+    image   : fd.get("image").size ? fd.get("image") : undefined
   };
+  await pb.collection("messages").create(data);   // no extra fetch
+  e.target.reset();
+}
   +  // create returns a record without expand → re-fetch with author
   const rec = await pb.collection("messages")
                       .create(data, { expand: "author" });
@@ -209,19 +212,21 @@ async function loadMessages(channelId){
   setTimeout(()=>document.getElementById("msgwrap").scrollTop=9e9);
 }
 function subscribeMessages(channelId){
-   state.msgSub = pb.collection("messages")
-   .subscribe(`channel='${channelId}'`, async ev => {
-     if (ev.action === "create") {
-       // re-fetch the one new record with its author relation expanded
-       const full = await pb.collection("messages")
-                            .getOne(ev.record.id, { expand: "author" });
-       state.messages.push(full);
-     } else if (ev.action === "update") {
-        state.messages = state.messages.filter(x=>x.id!==ev.record.id);
+  state.msgSub = pb.collection("messages")
+    // pass an options object → PB will expand "author" in every event
+    .subscribe(`channel='${channelId}'`, (ev) => {
+      if (ev.action === "create") {
+        state.messages.push(ev.record);              // record already has author
+      } else if (ev.action === "update") {
+        const i = state.messages.findIndex(x => x.id === ev.record.id);
+        if (i > -1) state.messages[i] = ev.record;
+      } else if (ev.action === "delete") {
+        state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
       draw();
-  });
+    }, { expand: "author" });   // <<< this line makes the magic
 }
+
 
 /* ---------- INIT ---------- */
 if(state.user) loadChannels();
