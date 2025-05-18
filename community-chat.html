@@ -177,13 +177,7 @@ async function sendMsg(e){
   await pb.collection("messages").create(data);   // no extra fetch
   e.target.reset();
 }
-  +  // create returns a record without expand → re-fetch with author
-  const rec = await pb.collection("messages")
-                      .create(data, { expand: "author" });
-  state.messages.push(rec);
-  draw();
-  e.target.reset();
-}
+   
 async function delMsg(m){ if(confirm("Delete message?"))
   await pb.collection("messages").delete(m.id); }
 async function pinMsg(m){
