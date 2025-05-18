@@ -219,10 +219,12 @@ async function loadMessages(channelId){
 }
 function subscribeMessages(channelId){
   state.msgSub = pb.collection("messages").subscribe(
-    "*",                           // listen to the whole collection
+    "*",
     ev => {
       if (ev.action === "create") {
-        state.messages.push(ev.record);
+        if (!state.messages.some(m => m.id === ev.record.id)) {
+          state.messages.push(ev.record);
+        }
       } else if (ev.action === "update") {
         const i = state.messages.findIndex(x => x.id === ev.record.id);
         if (i > -1) state.messages[i] = ev.record;
@@ -231,12 +233,10 @@ function subscribeMessages(channelId){
       }
       draw();
     },
-    {                                // ← options object
-      filter : `channel='${channelId}'`,
-      expand : "author"
-    }
+    { filter:`channel='${channelId}'`, expand:"author" }
   );
 }
+
 
 
 /* ---------- INIT ---------- */
