@@ -120,10 +120,13 @@ function chatUI(){
 function renderMsg(m){
   const you = m.author.id === state.user.id;
   const roleIcon = m.author.role==="admin"?"★":m.author.role==="moderator"?"☆":"";
+  const avatarSrc = pb.files.getUrl(m.author, "avatar", { thumb: "64x64" });
+  const imageSrc  = m.image
+      ? pb.files.getUrl(m, "image", { thumb: "640x640" })
+      : null;
   return html`
   <article class="flex gap-3" id="m-${m.id}">
-    <img class="w-10 h-10 rounded-full"
-         src="${PB_URL}/api/files/_pb_users_auth_/${m.author.id}/${m.author.avatar}?thumb=64x64">
+    <img class="w-10 h-10 rounded-full" src=${avatarSrc}>
     <div class="flex-1">
       <header class="text-sm mb-1">
         <span class="font-semibold">${m.author.displayName}</span>
@@ -137,8 +140,7 @@ function renderMsg(m){
                    class="ml-2 text-xs">${m.pinned?'Unpin':'Pin'}</button>` : ""}
       </header>
       ${m.text?    html`<p class="whitespace-pre-wrap">${m.text}</p>`:""}
-      ${m.image?   html`<img class="max-w-xs rounded mt-2"
-                       src="${PB_URL}/api/files/messages/${m.id}/${m.image}?thumb=640x640">`:""}
+      ${imageSrc ? html`<img class="max-w-xs rounded mt-2" src=${imageSrc}>` : ""}
     </div>
   </article>`; }
 
