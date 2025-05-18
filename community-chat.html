@@ -198,7 +198,7 @@ async function loadMessages(channelId){
   const list = await pb.collection("messages").getFullList({
     filter:`channel='${channelId}'`,
     expand:"author",
-    sort:"-pinned,-created"
+    sort:"-pinned,created"
   });
   setState({messages:list});
   subscribeMessages(channelId);
