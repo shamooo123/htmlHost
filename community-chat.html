@@ -168,13 +168,25 @@ function switchChannel(c){
 async function sendMsg(e){
   e.preventDefault();
   const fd = new FormData(e.target);
+
   const data = {
     channel : state.current.id,
     author  : state.user.id,
     text    : fd.get("text"),
     image   : fd.get("image").size ? fd.get("image") : undefined
   };
-  await pb.collection("messages").create(data);   // no extra fetch
+
+  // ① create the record …
+  const rec = await pb.collection("messages").create(data);
+
+  // ② … immediately re-fetch it WITH the author expansion
+  const full = await pb.collection("messages")
+                       .getOne(rec.id, { expand: "author" });
+
+  // ③ push into our local array and redraw
+  state.messages.push(full);
+  draw();
+
   e.target.reset();
 }
    
@@ -207,18 +219,17 @@ async function loadMessages(channelId){
 }
 function subscribeMessages(channelId){
   state.msgSub = pb.collection("messages")
-    // pass an options object → PB will expand "author" in every event
-    .subscribe(`channel='${channelId}'`, (ev) => {
-      if (ev.action === "create") {
-        state.messages.push(ev.record);              // record already has author
-      } else if (ev.action === "update") {
-        const i = state.messages.findIndex(x => x.id === ev.record.id);
-        if (i > -1) state.messages[i] = ev.record;
-      } else if (ev.action === "delete") {
-        state.messages = state.messages.filter(x => x.id !== ev.record.id);
-      }
-      draw();
-    }, { expand: "author" });   // <<< this line makes the magic
+  .subscribe(`channel='${channelId}'`, ev => {
+    if (ev.action === "create") {
+      state.messages.push(ev.record);      // events *from other users*
+    } else if (ev.action === "update") {
+      const i = state.messages.findIndex(x => x.id === ev.record.id);
+      if (i > -1) state.messages[i] = ev.record;
+    } else if (ev.action === "delete") {
+      state.messages = state.messages.filter(x => x.id !== ev.record.id);
+    }
+    draw();
+  }, { expand: "author" });
 }
 
 
