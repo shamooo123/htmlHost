@@ -176,16 +176,7 @@ async function sendMsg(e){
     image   : fd.get("image").size ? fd.get("image") : undefined
   };
 
-  // ① create the record …
-  const rec = await pb.collection("messages").create(data);
-
-  // ② … immediately re-fetch it WITH the author expansion
-  const full = await pb.collection("messages")
-                       .getOne(rec.id, { expand: "author" });
-
-  // ③ push into our local array and redraw
-  state.messages.push(full);
-  draw();
+  await pb.collection("messages").create(data);   // just create; SSE will add it
 
   e.target.reset();
 }
