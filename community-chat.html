@@ -167,26 +167,23 @@ function switchChannel(c){
   setState({current:c,messages:[]});
   loadMessages(c.id);
 }
+   
 async function sendMsg(e){
   e.preventDefault();
-  const fd = new FormData(e.target);          // keep the raw FormData
-
-  // required relational fields must be sent as text parts
+  const fd = new FormData(e.target);
   fd.set("channel", state.current.id);
   fd.set("author",  state.user.id);
-
-  // if no text entered remove the empty “text” part
-  if (!fd.get("text").trim()) fd.delete("text");
-
-  // if no image chosen remove the empty “image” part
+  if (!fd.get("text").trim())  fd.delete("text");
   if (!fd.get("image") || fd.get("image").size === 0) fd.delete("image");
 
-  // create the record (SDK will send multipart/form-data automatically)
-  await pb.collection("messages").create(fd, { expand: "author" });
-
-  // the realtime event will add it to the list; just reset the form
+  await pb.collection("messages").create(fd, { expand:"author" });
   e.target.reset();
+
+  // jump to bottom so you see your own post immediately
+  const wrap = document.getElementById("msgwrap");
+  wrap.scrollTop = wrap.scrollHeight;
 }
+
 
    
 async function delMsg(m){ if(confirm("Delete message?"))
@@ -220,8 +217,14 @@ function subscribeMessages(channelId){
   state.msgSub = pb.collection("messages").subscribe(
     "*",
     ev => {
+      // ---   smart scroll: were we near bottom before the new event?   ---
+      const wrap = document.getElementById("msgwrap");
+      const atBottom =
+        wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40; // 40 px threshold
+
+      // ---   process the realtime event   ---
       if (ev.action === "create") {
-        if (!state.messages.some(m => m.id === ev.record.id)) {
+        if (!state.messages.some(x => x.id === ev.record.id)) {
           state.messages.push(ev.record);
         }
       } else if (ev.action === "update") {
@@ -230,11 +233,16 @@ function subscribeMessages(channelId){
       } else if (ev.action === "delete") {
         state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
+
       draw();
+
+      // ---   snap to bottom only if the user was there already   ---
+      if (atBottom) wrap.scrollTop = wrap.scrollHeight;
     },
     { filter:`channel='${channelId}'`, expand:"author" }
   );
 }
+
 
 
 
