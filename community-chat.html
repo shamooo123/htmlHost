@@ -153,7 +153,9 @@ function renderMsg(m){
     ${avatarEl}
     <div class="flex-1">
       <header class="text-sm mb-1">
-        <span class="font-semibold">${m.author.displayName}</span>
+       <span class="font-semibold">
+  ${m.author.displayName || m.author.name || m.author.email}
+</span>
         ${roleIcon ? html`<span class="ml-1 text-xs">${roleIcon}</span>` : ""}
         <time class="ml-2 text-gray-500 text-xs">
           ${new Date(m.created).toLocaleString()}
