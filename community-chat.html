@@ -123,31 +123,29 @@ function renderMsg(m){
                      ? "★"
                      : m.author.role === "moderator" ? "☆" : "";
 
- /* ---------- avatar (image or initials) ---------- */
-let avatarEl;
+  /* ---------- avatar ---------- */
+  let avatarEl;
+  if (typeof m.author === "object" && m.author.avatar) {
+    const avatarSrc = pb.files.getURL(m.author, "avatar", { thumb: "64x64" });
+    avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc}>`;
+  } else {
+    const name = typeof m.author === "object" && m.author.displayName
+                 ? m.author.displayName
+                 : "??";
+    const initials = name.slice(0, 2).toUpperCase();
+    avatarEl = html`
+      <div class="w-10 h-10 rounded-full flex items-center justify-center
+                  bg-gray-300 text-xs font-semibold">
+        ${initials}
+      </div>`;
+  }
 
-if (typeof m.author === "object" && m.author.avatar) {
-  const avatarSrc = pb.files.getUrl(m.author, "avatar", { thumb: "64x64" });
-  avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc}>`;
-} else {
-  // if m.author is a string or has no avatar, show initials fallback
-  const name = typeof m.author === "object" && m.author.displayName
-               ? m.author.displayName
-               : "??";
-  const initials = name.slice(0, 2).toUpperCase();
-  avatarEl = html`
-    <div class="w-10 h-10 rounded-full flex items-center justify-center
-                bg-gray-300 text-xs font-semibold">
-      ${initials}
-    </div>`;
-}
-
-  /* ---------- attached picture (optional) ---------- */
-  const imageEl = m.image
-    ? html`
-        <img class="max-w-xs rounded mt-2"
-             src=${pb.files.getUrl(m, "image", { thumb: "640x640" })}>`
-    : "";
+  /* ---------- attached image (only if non-empty) ---------- */
+  let imageEl = "";
+  if (m.image && m.image.length) {
+    const imgSrc = pb.files.getURL(m, "image", { thumb: "640x640" });
+    imageEl = html`<img class="max-w-xs rounded mt-2" src=${imgSrc}>`;
+  }
 
   /* ---------- template ---------- */
   return html`
@@ -174,6 +172,7 @@ if (typeof m.author === "object" && m.author.avatar) {
     </div>
   </article>`;
 }
+
 
 
 function msgComposer(){ return html`
