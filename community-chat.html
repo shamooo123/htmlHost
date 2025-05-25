@@ -123,16 +123,24 @@ function renderMsg(m){
                      ? "★"
                      : m.author.role === "moderator" ? "☆" : "";
 
-  /* ---------- avatar (image or initials) ---------- */
-  const avatarEl = m.author.avatar
-    ? html`
-        <img class="w-10 h-10 rounded-full"
-             src=${pb.files.getUrl(m.author, "avatar", { thumb: "64x64" })}>`
-    : html`
-        <div class="w-10 h-10 rounded-full flex items-center justify-center
-                    bg-gray-300 text-xs font-semibold">
-          ${m.author.displayName.slice(0,2).toUpperCase()}
-        </div>`;
+ /* ---------- avatar (image or initials) ---------- */
+let avatarEl;
+
+if (typeof m.author === "object" && m.author.avatar) {
+  const avatarSrc = pb.files.getUrl(m.author, "avatar", { thumb: "64x64" });
+  avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc}>`;
+} else {
+  // if m.author is a string or has no avatar, show initials fallback
+  const name = typeof m.author === "object" && m.author.displayName
+               ? m.author.displayName
+               : "??";
+  const initials = name.slice(0, 2).toUpperCase();
+  avatarEl = html`
+    <div class="w-10 h-10 rounded-full flex items-center justify-center
+                bg-gray-300 text-xs font-semibold">
+      ${initials}
+    </div>`;
+}
 
   /* ---------- attached picture (optional) ---------- */
   const imageEl = m.image
