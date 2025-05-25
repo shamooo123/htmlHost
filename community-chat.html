@@ -119,28 +119,29 @@ function chatUI(){
 
 function renderMsg(m){
   const you      = m.author.id === state.user.id;
-  const roleIcon = m.author.role==="admin" ? "★"
-                 : m.author.role==="moderator" ? "☆" : "";
+  const roleIcon = m.author.role === "admin"
+                     ? "★"
+                     : m.author.role === "moderator" ? "☆" : "";
 
-  /* -------- avatar ------- */
-  let avatarEl;
-  if (m.author.avatar) {
-    const avatarSrc = pb.files.getUrl(m.author, "avatar", { thumb: "64x64" });
-    avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc}>`;
-  } else {
-    // fallback: initials in a gray circle
-    const initials = m.author.displayName.slice(0,2).toUpperCase();
-    avatarEl = html`
-      <div class="w-10 h-10 rounded-full flex items-center justify-center
-                  bg-gray-300 text-xs font-semibold">
-        ${initials}
-      </div>`;
-  }
-   const imageEl = m.image
-    ? html`<img class="max-w-xs rounded mt-2"
-                src=${pb.files.getUrl(m, "image", { thumb:"640x640" })}>`
+  /* ---------- avatar (image or initials) ---------- */
+  const avatarEl = m.author.avatar
+    ? html`
+        <img class="w-10 h-10 rounded-full"
+             src=${pb.files.getUrl(m.author, "avatar", { thumb: "64x64" })}>`
+    : html`
+        <div class="w-10 h-10 rounded-full flex items-center justify-center
+                    bg-gray-300 text-xs font-semibold">
+          ${m.author.displayName.slice(0,2).toUpperCase()}
+        </div>`;
+
+  /* ---------- attached picture (optional) ---------- */
+  const imageEl = m.image
+    ? html`
+        <img class="max-w-xs rounded mt-2"
+             src=${pb.files.getUrl(m, "image", { thumb: "640x640" })}>`
     : "";
 
+  /* ---------- template ---------- */
   return html`
   <article class="flex gap-3" id="m-${m.id}">
     ${avatarEl}
@@ -152,12 +153,12 @@ function renderMsg(m){
           ${new Date(m.created).toLocaleString()}
         </time>
 
-        ${(isMod()||you)
-          ? html`<button @click=${()=>delMsg(m)}
+        ${(isMod() || you)
+          ? html`<button @click=${() => delMsg(m)}
                    class="ml-2 text-red-600 text-xs">Delete</button>` : ""}
         ${isMod()
-          ? html`<button @click=${()=>pinMsg(m)}
-                   class="ml-2 text-xs">${m.pinned?'Unpin':'Pin'}</button>` : ""}
+          ? html`<button @click=${() => pinMsg(m)}
+                   class="ml-2 text-xs">${m.pinned ? 'Unpin' : 'Pin'}</button>` : ""}
       </header>
 
       ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
@@ -165,6 +166,7 @@ function renderMsg(m){
     </div>
   </article>`;
 }
+
 
 function msgComposer(){ return html`
   <form @submit=${sendMsg} class="flex gap-3 border-t p-3 bg-gray-50">
