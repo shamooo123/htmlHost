@@ -129,9 +129,9 @@ function renderMsg(m){
     const avatarSrc = pb.files.getURL(user, "avatar", { thumb: "64x64" });
     avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc}>`;
   } else {
-    const name = typeof user === "object"
-                   ? user.displayName || user.email || "??"
-                   : "??";
+    const name = typeof user === "object" && user.displayName
+               ? user.displayName
+               : (typeof user === "string" ? user.slice(0,2) : "User");
     const initials = name.slice(0,2).toUpperCase();
     avatarEl = html`
       <div class="w-10 h-10 rounded-full flex items-center justify-center
