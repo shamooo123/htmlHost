@@ -118,21 +118,21 @@ function chatUI(){
   </div>`; }
 
 function renderMsg(m){
-  const you      = m.author.id === state.user.id;
-  const roleIcon = m.author.role === "admin"
-                     ? "★"
-                     : m.author.role === "moderator" ? "☆" : "";
+  // full user record if expand is present; otherwise just the ID string
+  const user = m.expand?.author ?? m.author;
+  const you  = (typeof user === "object") && user.id === state.user.id;
 
-  /* ---------- avatar ---------- */
+  /* ---------- avatar (image or initials) ---------- */
   let avatarEl;
-  if (typeof m.author === "object" && m.author.avatar) {
-    const avatarSrc = pb.files.getURL(m.author, "avatar", { thumb: "64x64" });
+
+  if (typeof user === "object" && user.avatar) {
+    const avatarSrc = pb.files.getURL(user, "avatar", { thumb: "64x64" });
     avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc}>`;
   } else {
-    const name = typeof m.author === "object" && m.author.displayName
-                 ? m.author.displayName
-                 : "??";
-    const initials = name.slice(0, 2).toUpperCase();
+    const name = typeof user === "object"
+                   ? user.displayName || user.email || "??"
+                   : "??";
+    const initials = name.slice(0,2).toUpperCase();
     avatarEl = html`
       <div class="w-10 h-10 rounded-full flex items-center justify-center
                   bg-gray-300 text-xs font-semibold">
@@ -140,33 +140,41 @@ function renderMsg(m){
       </div>`;
   }
 
-  /* ---------- attached image (only if non-empty) ---------- */
-  let imageEl = "";
-  if (m.image && m.image.length) {
-    const imgSrc = pb.files.getURL(m, "image", { thumb: "640x640" });
-    imageEl = html`<img class="max-w-xs rounded mt-2" src=${imgSrc}>`;
-  }
+  /* ---------- attached image (optional) ---------- */
+  const imageEl = (m.image && m.image.length)
+      ? html`<img class="max-w-xs rounded mt-2"
+                 src=${pb.files.getURL(m, "image", { thumb:"640x640" })}>`
+      : "";
+
+  /* ---------- role icon ---------- */
+  const roleIcon =
+      typeof user === "object" && user.role === "admin"     ? "★" :
+      typeof user === "object" && user.role === "moderator" ? "☆" : "";
 
   /* ---------- template ---------- */
   return html`
   <article class="flex gap-3" id="m-${m.id}">
     ${avatarEl}
+
     <div class="flex-1">
       <header class="text-sm mb-1">
-       <span class="font-semibold">
-  ${m.author.displayName || m.author.name || m.author.email}
-</span>
+        <span class="font-semibold">
+          ${typeof user === "object"
+              ? user.displayName || user.email
+              : user       /* ← unlikely, but safe */}
+        </span>
         ${roleIcon ? html`<span class="ml-1 text-xs">${roleIcon}</span>` : ""}
+
         <time class="ml-2 text-gray-500 text-xs">
           ${new Date(m.created).toLocaleString()}
         </time>
 
         ${(isMod() || you)
-          ? html`<button @click=${() => delMsg(m)}
+          ? html`<button @click=${()=>delMsg(m)}
                    class="ml-2 text-red-600 text-xs">Delete</button>` : ""}
         ${isMod()
-          ? html`<button @click=${() => pinMsg(m)}
-                   class="ml-2 text-xs">${m.pinned ? 'Unpin' : 'Pin'}</button>` : ""}
+          ? html`<button @click=${()=>pinMsg(m)}
+                   class="ml-2 text-xs">${m.pinned ? "Unpin" : "Pin"}</button>` : ""}
       </header>
 
       ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
@@ -174,6 +182,7 @@ function renderMsg(m){
     </div>
   </article>`;
 }
+
 
 
 
