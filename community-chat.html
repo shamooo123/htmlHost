@@ -192,14 +192,32 @@ if (typeof user === "object" && user.avatar) {
 
 
 
+/* ---------- composer with live preview ---------- */
 function msgComposer(){ return html`
-  <form @submit=${sendMsg} class="flex gap-3 border-t p-3 bg-gray-50">
-    <input name="text" placeholder="Message…" autocomplete="off"
-           class="flex-1 p-2 border rounded">
-    <input name="image" type="file" accept="image/*" class="hidden">
-    <button type="button"
-            @click=${e=>e.target.previousElementSibling.click()}>📷</button>
-    <button class="px-4 py-2 bg-indigo-600 text-white rounded">Send</button>
+  <form @submit=${sendMsg} class="flex flex-col gap-2 border-t p-3 bg-gray-50">
+    <!-- preview (hidden until a file is chosen) -->
+    <div id="imgPreview" class="hidden flex items-center gap-2">
+      <img id="imgThumb" class="w-16 h-16 rounded object-cover">
+      <span id="imgName" class="text-sm text-gray-700"></span>
+      <button type="button" @click=${clearImage} class="text-red-600 text-xs">
+        ✕
+      </button>
+    </div>
+
+    <div class="flex gap-3">
+      <input name="text" placeholder="Message…" autocomplete="off"
+             class="flex-1 p-2 border rounded">
+
+      <input  id="imgInput" name="image" type="file" accept="image/*"
+              class="hidden" @change=${showPreview} >
+
+      <button type="button"
+              @click=${()=>document.getElementById("imgInput").click()}>
+        📷
+      </button>
+
+      <button class="px-4 py-2 bg-indigo-600 text-white rounded">Send</button>
+    </div>
   </form>`; }
 
 /* ---------- ACTIONS ---------- */
@@ -215,23 +233,60 @@ function switchChannel(c){
   setState({current:c,messages:[]});
   loadMessages(c.id);
 }
+
+/* ---- helper: show preview when a file is picked ---- */
+function showPreview(e){
+  const file = e.target.files[0];
+  if (!file) return clearImage();
+
+  const url   = URL.createObjectURL(file);
+  imgThumb.src      = url;
+  imgName.textContent = file.name;
+  imgPreview.classList.remove("hidden");
+}
+
+/* ---- helper: clear the chosen file ---- */
+function clearImage(){
+  const input = document.getElementById("imgInput");
+  input.value = "";          // reset <input type="file">
+  imgPreview.classList.add("hidden");
+}
    
+/* ---------- send message with error handling ---------- */
 async function sendMsg(e){
   e.preventDefault();
+
   const fd = new FormData(e.target);
   fd.set("channel", state.current.id);
   fd.set("author",  state.user.id);
-  if (!fd.get("text").trim())  fd.delete("text");
-  if (!fd.get("image") || fd.get("image").size === 0) fd.delete("image");
 
-  await pb.collection("messages").create(fd, { expand:"author" });
-  e.target.reset();
+  // trim empty text
+  if (!fd.get("text").trim()) fd.delete("text");
 
-  // jump to bottom so you see your own post immediately
-  const wrap = document.getElementById("msgwrap");
-  wrap.scrollTop = wrap.scrollHeight;
+  // skip image if none selected
+  const imgFile = fd.get("image");
+  if (!imgFile || imgFile.size === 0) fd.delete("image");
+
+  try {
+    const rec = await pb.collection("messages")
+                        .create(fd, { expand: "author" });
+
+    state.messages.push(rec);  // optimistic update
+    draw();
+
+    // clear form + preview
+    e.target.reset();
+    clearImage();
+
+    // jump to bottom
+    const wrap = document.getElementById("msgwrap");
+    wrap.scrollTop = wrap.scrollHeight;
+
+  } catch (err){
+    alert(err?.message || "Failed to send message.");
+    console.error(err);
+  }
 }
-
 
    
 async function delMsg(m){ if(confirm("Delete message?"))
