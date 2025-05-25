@@ -123,22 +123,28 @@ function renderMsg(m){
   const you  = (typeof user === "object") && user.id === state.user.id;
 
   /* ---------- avatar (image or initials) ---------- */
-  let avatarEl;
+let avatarEl;
 
-  if (typeof user === "object" && user.avatar) {
-    const avatarSrc = pb.files.getURL(user, "avatar", { thumb: "64x64" });
-    avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc}>`;
-  } else {
-    const name = typeof user === "object" && user.displayName
-               ? user.displayName
-               : (typeof user === "string" ? user.slice(0,2) : "User");
-    const initials = name.slice(0,2).toUpperCase();
-    avatarEl = html`
-      <div class="w-10 h-10 rounded-full flex items-center justify-center
-                  bg-gray-300 text-xs font-semibold">
-        ${initials}
-      </div>`;
-  }
+if (typeof user === "object" && user.avatar) {
+  // Auth-user files live under the internal bucket “_pb_users_auth_”
+  const avatarSrc =
+    `${PB_URL}/api/files/_pb_users_auth_/${user.id}/${user.avatar}?thumb=64x64`;
+
+  avatarEl = html`
+    <img class="w-10 h-10 rounded-full" src=${avatarSrc} alt="avatar">`;
+} else {
+  // fallback: grey circle with initials
+  const name      = typeof user === "object"
+                      ? user.displayName || user.email || "??"
+                      : "??";
+  const initials  = name.slice(0, 2).toUpperCase();
+
+  avatarEl = html`
+    <div class="w-10 h-10 rounded-full flex items-center justify-center
+                bg-gray-300 text-xs font-semibold">
+      ${initials}
+    </div>`;
+}
 
   /* ---------- attached image (optional) ---------- */
   const imageEl = (m.image && m.image.length)
