@@ -320,11 +320,22 @@ function subscribeMessages(channelId){
       };
 
       /* -------- CREATE -------- */
-      if (ev.action === "create") {
-        // fetch the stored record (now has image filename)
-        const full = await pb.collection("messages")
-                             .getOne(ev.record.id, { expand:"author" });
-        upsert(full);
+if (ev.action === "create") {
+  let rec = ev.record;
+
+  // If the filename is still the placeholder "image", refetch once.
+  if (rec.image === "" || rec.image === "image") {
+    try {
+      rec = await pb.collection("messages")
+                    .getOne(rec.id, { expand:"author" });
+    } catch (err) {
+      console.warn("Retry fetch failed", err);
+    }
+  }
+
+  upsert(rec);          // same helper you already have
+}
+
 
       /* -------- UPDATE -------- */
       } else if (ev.action === "update") {
