@@ -300,25 +300,35 @@ async function loadChannels(){
    
 async function loadMessages(channelId){
   let list = await pb.collection("messages").getFullList({
-    filter:`channel='${channelId}'`,
-    expand:"author",
-    sort:"-pinned,created"
+    filter : `channel='${channelId}'`,
+    expand : "author",
+    sort   : "-pinned,created"
   });
 
-  /* 🔸 refetch legacy records whose image === "image"  */
+  /* ▶ refetch legacy records whose filename is still the placeholder */
   await Promise.all(
     list.map(async (m,i) => {
-      if (m.image === "image") {
+      const isPlaceholder =
+        m.image === "image" ||
+        (Array.isArray(m.image) && m.image[0] === "image");
+
+      if (isPlaceholder) {
         list[i] = await pb.collection("messages")
                           .getOne(m.id, { expand:"author" });
       }
     })
   );
 
-  setState({messages:list});
+  /* ▶ normalise: keep only the first filename as a string */
+  list.forEach(m => {
+    if (Array.isArray(m.image)) m.image = m.image[0] || "";
+  });
+
+  setState({ messages:list });
   subscribeMessages(channelId);
-  setTimeout(()=>document.getElementById("msgwrap").scrollTop=9e9);
+  setTimeout(()=>document.getElementById("msgwrap").scrollTop = 9e9);
 }
+
 
 
    
@@ -348,7 +358,10 @@ function subscribeMessages(channelId){
             console.warn("retry fetch failed", err);
           }
         }
-        upsert(rec);
+        // keep only the first filename if the field is an array
+if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
+upsert(rec);
+
 
       /* ------------- UPDATE ------------- */
       } else if (ev.action === "update") {
@@ -358,7 +371,10 @@ function subscribeMessages(channelId){
           rec = await pb.collection("messages")
                         .getOne(rec.id, { expand:"author" });
         }
-        upsert(rec);
+       // keep only the first filename if the field is an array
+if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
+upsert(rec);
+
 
       /* ------------- DELETE ------------- */
       } else if (ev.action === "delete") {
