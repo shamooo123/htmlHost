@@ -147,11 +147,11 @@ if (typeof user === "object" && user.avatar) {
 }
 
   /* attached image (optional) */
-const imageEl =
-  m.image && m.image.length
-    ? html`<img class="max-w-xs rounded mt-2"
-                src=${pb.files.getURL(m, "image")}>`
-    : "";
+ const firstFile = Array.isArray(m.image) ? m.image[0] : m.image;
+ const imageEl   = firstFile
+     ? html`<img class="max-w-xs rounded mt-2"
+                 src=${pb.files.getURL(m, firstFile, { thumb:"640x640" })}>`
+     : "";
 
 
   /* ---------- role icon ---------- */
