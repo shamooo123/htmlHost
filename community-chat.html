@@ -27,6 +27,12 @@ const state = {
 };
 const setState = (obj)=>{ Object.assign(state,obj); draw(); };
 
+/* ------- pin-banner helper state ------- */
+let pinTimer   = null;        // rotation interval
+let pinIndex   = 0;           // which pinned msg is showing
+let pinExpanded = false;      // banner is unfolded?
+
+
 /* ----------------------------------------------------
    RENDER LOOP
 ---------------------------------------------------- */
@@ -109,6 +115,17 @@ function chatUI(){
       </header>
 
       <section id="msgwrap" class="flex-1 p-4 overflow-y-auto space-y-3 bg-white">
+      ${state.pinned.length
+  ? html`
+      <div class="border border-indigo-300 bg-indigo-50 px-3 py-1
+                  text-sm cursor-pointer select-none
+                  overflow-hidden whitespace-nowrap text-ellipsis"
+           @click=${togglePinBanner}
+           title="Click to expand / collapse">
+        🔖 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
+      </div>`
+  : ""}
+
         ${state.messages.filter(m=>m.pinned).map(renderMsg)}
         ${state.messages.filter(m=>!m.pinned).map(renderMsg)}
       </section>
@@ -291,6 +308,39 @@ function clearImage(){
   input.value = "";          // reset <input type="file">
   imgPreview.classList.add("hidden");
 }
+
+   /* ---- shorten long texts for the banner ---- */
+function truncate(str, max = 110) {
+  if (!str) return "";
+  return str.length > max ? str.slice(0, max) + "…" : str;
+}
+
+/* ---- toggle banner expansion ---- */
+function togglePinBanner() {
+  pinExpanded = !pinExpanded;
+  if (pinExpanded) {
+    // show modal with all pinned messages
+    showPinnedModal();
+  }
+}
+
+/* ---- modal viewer ---- */
+function showPinnedModal() {
+  const modal = document.createElement("div");
+  modal.className =
+    "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl max-h-[80vh] w-[90vw] max-w-lg p-4
+                overflow-y-auto space-y-4">
+      <h2 class="text-lg font-semibold mb-2">Pinned messages</h2>
+      ${state.pinned.map(renderMsg).join("")}
+      <button class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded
+                     mx-auto block">Close</button>
+    </div>`;
+  modal.querySelector("button").onclick = () => document.body.removeChild(modal);
+  document.body.appendChild(modal);
+}
+
    
 /* ---------- send message with error handling ---------- */
 async function sendMsg(e){
@@ -362,80 +412,81 @@ async function loadMessages(channelId){
     if (Array.isArray(m.image)) m.image = m.image[0] || "";
   });
 
-  setState({ messages:list });
+  const pinned = list.filter(m => m.pinned).sort(
+  (a,b) => new Date(a.created) - new Date(b.created)
+);
+setState({ messages:list, pinned });
+startPinRotation();
+ 
+  //setState({ messages:list });
   subscribeMessages(channelId);
   setTimeout(()=>document.getElementById("msgwrap").scrollTop = 9e9);
 }
-
-
-
    
 function subscribeMessages(channelId){
   state.msgSub = pb.collection("messages").subscribe(
     "*",
     /* ------------ event handler ------------ */
     async ev => {
-
-      /* helper: insert or replace a record in state.messages */
+      /* helper: insert or replace a record */
       const upsert = rec => {
         const i = state.messages.findIndex(x => x.id === rec.id);
-        if (i === -1) state.messages.push(rec);
-        else           state.messages[i] = rec;
+        i === -1 ? state.messages.push(rec) : state.messages[i] = rec;
       };
 
-      /* ------------- CREATE ------------- */
+      /* -------- CREATE -------- */
       if (ev.action === "create") {
         let rec = ev.record;
-
-        // filename still empty? → refetch once
-        if (!rec.image || rec.image === "image") {
-          try {
-            rec = await pb.collection("messages")
-                          .getOne(rec.id, { expand:"author" });
-          } catch (err) {
-            console.warn("retry fetch failed", err);
-          }
-        }
-        // keep only the first filename if the field is an array
-if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
-upsert(rec);
-
-
-      /* ------------- UPDATE ------------- */
-      } else if (ev.action === "update") {
-        let rec = ev.record;
-
         if (!rec.image || rec.image === "image") {
           rec = await pb.collection("messages")
                         .getOne(rec.id, { expand:"author" });
         }
-       // keep only the first filename if the field is an array
-if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
-upsert(rec);
+        if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
+        upsert(rec);
 
+      /* -------- UPDATE -------- */
+      } else if (ev.action === "update") {
+        let rec = ev.record;
+        if (!rec.image || rec.image === "image") {
+          rec = await pb.collection("messages")
+                        .getOne(rec.id, { expand:"author" });
+        }
+        if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
+        upsert(rec);
 
-      /* ------------- DELETE ------------- */
+      /* -------- DELETE -------- */
       } else if (ev.action === "delete") {
         state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
 
-      
+      /* recompute pinned + maybe restart rotation */
+      state.pinned = state.messages.filter(m => m.pinned).sort(
+        (a,b) => new Date(a.created) - new Date(b.created)
+      );
+      startPinRotation();
 
-      /* smart-scroll: stay at bottom only if we were already there */
-     /* ---------- was the user already at the bottom? ---------- */
-     const wrap     = document.getElementById("msgwrap");
-     const atBottom = wrap &&
-         (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
+      /* smart-scroll */
+      const wrap     = document.getElementById("msgwrap");
+      const atBottom = wrap &&
+        (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
 
-       draw();
-
-            /* ---------- keep the user in place if they were there ---------- */
-     if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
+      draw();
+      if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
     },
     { filter:`channel='${channelId}'`, expand:"author" }
   );
 }
 
+
+function startPinRotation() {
+  clearInterval(pinTimer);
+  if (state.pinned.length <= 1) return;
+  pinIndex = 0;
+  pinTimer = setInterval(() => {
+    pinIndex = (pinIndex + 1) % state.pinned.length;
+    draw();
+  }, 3000);
+}
 
 
 
