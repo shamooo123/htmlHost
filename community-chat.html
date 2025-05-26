@@ -307,61 +307,63 @@ async function loadMessages(channelId){
   subscribeMessages(channelId);
   setTimeout(()=>document.getElementById("msgwrap").scrollTop=9e9);
 }
+
+   
 function subscribeMessages(channelId){
   state.msgSub = pb.collection("messages").subscribe(
     "*",
+    /* ------------ event handler ------------ */
     async ev => {
-      // helper: replace/add the full record in state.messages
-       console.log("PB-event", ev); 
+
+      /* helper: insert or replace a record in state.messages */
       const upsert = rec => {
         const i = state.messages.findIndex(x => x.id === rec.id);
         if (i === -1) state.messages.push(rec);
         else           state.messages[i] = rec;
       };
 
-      /* -------- CREATE -------- */
-if (ev.action === "create") {
-  let rec = ev.record;
+      /* ------------- CREATE ------------- */
+      if (ev.action === "create") {
+        let rec = ev.record;
 
-  // If the filename is still the placeholder "image", refetch once.
-  if (rec.image === "" || rec.image === "image") {
-    try {
-      rec = await pb.collection("messages")
-                    .getOne(rec.id, { expand:"author" });
-    } catch (err) {
-      console.warn("Retry fetch failed", err);
-    }
-  }
-
-  upsert(rec);          // same helper you already have
-}
-
-
-      /* -------- UPDATE -------- */
-      } else if (ev.action === "update") {
-        let full = ev.record;
-        // if PocketBase didn’t include the filename yet, fetch it
-        if (!full.image || full.image === "") {
-          full = await pb.collection("messages")
-                         .getOne(ev.record.id, { expand:"author" });
+        // filename still empty? → refetch once
+        if (!rec.image || rec.image === "image") {
+          try {
+            rec = await pb.collection("messages")
+                          .getOne(rec.id, { expand:"author" });
+          } catch (err) {
+            console.warn("retry fetch failed", err);
+          }
         }
-        upsert(full);
+        upsert(rec);
 
-      /* -------- DELETE -------- */
+      /* ------------- UPDATE ------------- */
+      } else if (ev.action === "update") {
+        let rec = ev.record;
+
+        if (!rec.image || rec.image === "image") {
+          rec = await pb.collection("messages")
+                        .getOne(rec.id, { expand:"author" });
+        }
+        upsert(rec);
+
+      /* ------------- DELETE ------------- */
       } else if (ev.action === "delete") {
         state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
 
       draw();
 
-      /* smart-scroll logic unchanged */
-      const wrap      = document.getElementById("msgwrap");
-      const atBottom  = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
+      /* smart-scroll: stay at bottom only if we were already there */
+      const wrap     = document.getElementById("msgwrap");
+      const atBottom =
+        wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
       if (atBottom) wrap.scrollTop = wrap.scrollHeight;
     },
     { filter:`channel='${channelId}'`, expand:"author" }
   );
 }
+
 
 
 
