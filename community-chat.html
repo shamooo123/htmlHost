@@ -116,17 +116,19 @@ function chatUI(){
                 class="float-right text-red-600 text-sm">Log&nbsp;out</button>
       </header>
 
-      <section id="msgwrap" class="flex-1 p-4 overflow-y-auto space-y-3 bg-white">
-      ${state.pinned.length
-  ? html`
-      <div class="border border-indigo-300 bg-indigo-50 px-3 py-1
-                  text-sm cursor-pointer select-none
-                  overflow-hidden whitespace-nowrap text-ellipsis"
-           @click=${togglePinBanner}
-           title="Click to expand / collapse">
-        🔖 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
-      </div>`
-  : ""}
+      <section id="msgwrap"
+         class="relative flex-1 p-4 overflow-y-auto space-y-3 bg-white">
+
+     ${state.pinned.length ? html`
+  <div class="sticky top-0 z-10
+              border border-indigo-300 bg-indigo-50
+              px-3 py-1 text-sm cursor-pointer select-none
+              overflow-hidden whitespace-nowrap text-ellipsis"
+       @click=${togglePinBanner}
+       title="Click to expand / collapse">
+    🔖 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
+  </div>` : ""}
+
 
         ${state.messages.filter(m=>m.pinned).map(renderMsg)}
         ${state.messages.filter(m=>!m.pinned).map(renderMsg)}
@@ -328,20 +330,35 @@ function togglePinBanner() {
 
 /* ---- modal viewer ---- */
 function showPinnedModal() {
+  /* back-drop */
   const modal = document.createElement("div");
   modal.className =
     "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
-  modal.innerHTML = `
-    <div class="bg-white rounded-xl max-h-[80vh] w-[90vw] max-w-lg p-4
-                overflow-y-auto space-y-4">
-      <h2 class="text-lg font-semibold mb-2">Pinned messages</h2>
-      ${state.pinned.map(renderMsg).join("")}
-      <button class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded
-                     mx-auto block">Close</button>
-    </div>`;
-  modal.querySelector("button").onclick = () => document.body.removeChild(modal);
+
+  /* white card ----------------------------------------------- */
+  const card = document.createElement("div");
+  card.className =
+    "bg-white rounded-xl max-h-[80vh] w-[90vw] max-w-lg p-4 overflow-y-auto";
+  modal.appendChild(card);
+
+  /* close btn */
+  const close = () => document.body.removeChild(modal);
+  card.innerHTML = `
+      <h2 class="text-lg font-semibold mb-4">Pinned messages</h2>
+      <div id="pinList" class="space-y-4"></div>
+      <button id="pinClose"
+              class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded
+                     mx-auto block">Close</button>`;
+  card.querySelector("#pinClose").onclick = close;
+
+  /* render the list with Lit ------------------------------- */
+  const listHost = card.querySelector("#pinList");
+  render(state.pinned.map(renderMsg), listHost);
+
+  /* mount */
   document.body.appendChild(modal);
 }
+
 
    
 /* ---------- send message with error handling ---------- */
