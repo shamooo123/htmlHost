@@ -312,6 +312,7 @@ function subscribeMessages(channelId){
     "*",
     async ev => {
       // helper: replace/add the full record in state.messages
+       console.log("PB-event", ev); 
       const upsert = rec => {
         const i = state.messages.findIndex(x => x.id === rec.id);
         if (i === -1) state.messages.push(rec);
