@@ -262,35 +262,23 @@ async function sendMsg(e){
   fd.set("channel", state.current.id);
   fd.set("author",  state.user.id);
 
-  // trim empty text
-  if (!fd.get("text").trim()) fd.delete("text");
-
-  // skip image if none selected
-  const imgFile = fd.get("image");
-  if (!imgFile || imgFile.size === 0) fd.delete("image");
+  // trim empty text and image
+  if (!fd.get("text").trim())              fd.delete("text");
+  if (!fd.get("image") || fd.get("image").size === 0) fd.delete("image");
 
   try {
-    const tmp = await pb.collection("messages")
-                        .create(fd);              // returns stub
-    const full = await pb.collection("messages")
-                         .getOne(tmp.id, { expand:"author" });
-    state.messages.push(full);                     // real data
-    draw();
+      /*  create the stub record; we DON'T push it to the UI  */
+      await pb.collection("messages").create(fd);
 
-    // clear form + preview
-    e.target.reset();
-    clearImage();
-
-    // jump to bottom
-    const wrap = document.getElementById("msgwrap");
-    wrap.scrollTop = wrap.scrollHeight;
+      /*  clear form + preview immediately  */
+      e.target.reset();
+      clearImage();
 
   } catch (err){
-    alert(err?.message || "Failed to send message.");
-    console.error(err);
+      alert(err?.message || "Failed to send message.");   // validation, size, etc.
+      console.error(err);
   }
 }
-
    
 async function delMsg(m){ if(confirm("Delete message?"))
   await pb.collection("messages").delete(m.id); }
