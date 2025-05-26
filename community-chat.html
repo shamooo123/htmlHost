@@ -310,17 +310,18 @@ async function loadMessages(channelId){
 function subscribeMessages(channelId){
   state.msgSub = pb.collection("messages").subscribe(
     "*",
-    ev => {
+    async ev => {
       // ---   smart scroll: were we near bottom before the new event?   ---
       const wrap = document.getElementById("msgwrap");
       const atBottom =
         wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40; // 40 px threshold
 
       // ---   process the realtime event   ---
-      if (ev.action === "create") {
-        if (!state.messages.some(x => x.id === ev.record.id)) {
-          state.messages.push(ev.record);
-        }
+            if (ev.action === "create") {
+        // immediately re-fetch so `image` has a filename
+        const full = await pb.collection("messages")
+                            .getOne(ev.record.id, { expand:"author" });
+        state.messages.push(full);
       } else if (ev.action === "update") {
         const i = state.messages.findIndex(x => x.id === ev.record.id);
         if (i > -1) state.messages[i] = ev.record;
