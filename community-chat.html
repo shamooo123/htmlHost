@@ -146,11 +146,13 @@ if (typeof user === "object" && user.avatar) {
     </div>`;
 }
 
-  /* ---------- attached image (optional) ---------- */
-  const imageEl = (m.image && m.image.length)
-      ? html`<img class="max-w-xs rounded mt-2"
-                 src=${pb.files.getURL(m, "image", { thumb:"640x640" })}>`
-      : "";
+  /* attached image (optional) */
+const imageEl =
+  m.image && m.image.length
+    ? html`<img class="max-w-xs rounded mt-2"
+                src=${pb.files.getURL(m, "image")}>`
+    : "";
+
 
   /* ---------- role icon ---------- */
   const roleIcon =
