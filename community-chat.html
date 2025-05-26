@@ -126,7 +126,7 @@ function chatUI(){
               overflow-hidden whitespace-nowrap text-ellipsis"
        @click=${togglePinBanner}
        title="Click to expand / collapse">
-    🔖 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
+    📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
   </div>` : ""}
 
 
