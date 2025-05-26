@@ -270,10 +270,11 @@ async function sendMsg(e){
   if (!imgFile || imgFile.size === 0) fd.delete("image");
 
   try {
-    const rec = await pb.collection("messages")
-                        .create(fd, { expand: "author" });
-
-    state.messages.push(rec);  // optimistic update
+    const tmp = await pb.collection("messages")
+                        .create(fd);              // returns stub
+    const full = await pb.collection("messages")
+                         .getOne(tmp.id, { expand:"author" });
+    state.messages.push(full);                     // real data
     draw();
 
     // clear form + preview
