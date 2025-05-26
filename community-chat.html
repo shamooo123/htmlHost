@@ -221,7 +221,7 @@ if (typeof user === "object") {
                    class="ml-2 text-red-600 text-xs">Delete</button>` : ""}
         ${isMod()
           ? html`<button @click=${()=>pinMsg(m)}
-                   class="ml-2 text-xs">${m.pinned ? "Unpin" : "Pin"}</button>` : ""}
+                   class="ml-2 text-xs">${m.pinned ? "Unpin📌" : "Pin📌"}</button>` : ""}
       </header>
 
       ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
