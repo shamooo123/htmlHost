@@ -23,8 +23,10 @@ const state = {
   channels : [],
   current  : null,
   messages : [],
+  pinned   : [],      //  ←  NEW: always at least an empty array
   msgSub   : null
 };
+
 const setState = (obj)=>{ Object.assign(state,obj); draw(); };
 
 /* ------- pin-banner helper state ------- */
