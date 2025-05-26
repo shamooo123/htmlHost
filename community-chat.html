@@ -174,7 +174,13 @@ if (typeof user === "object" && user.avatar) {
         ${roleIcon ? html`<span class="ml-1 text-xs">${roleIcon}</span>` : ""}
 
         <time class="ml-2 text-gray-500 text-xs">
-          ${new Date(m.created).toLocaleString()}
+           ${new Date(m.created).toLocaleString([], {
+       year:  'numeric',
+       month: '2-digit',
+       day:   '2-digit',
+       hour:  '2-digit',
+       minute:'2-digit'
+   })}
         </time>
 
         ${(isMod() || you)
