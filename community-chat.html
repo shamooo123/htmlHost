@@ -311,32 +311,46 @@ function subscribeMessages(channelId){
   state.msgSub = pb.collection("messages").subscribe(
     "*",
     async ev => {
-      // ---   smart scroll: were we near bottom before the new event?   ---
-      const wrap = document.getElementById("msgwrap");
-      const atBottom =
-        wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40; // 40 px threshold
+      // helper: replace/add the full record in state.messages
+      const upsert = rec => {
+        const i = state.messages.findIndex(x => x.id === rec.id);
+        if (i === -1) state.messages.push(rec);
+        else           state.messages[i] = rec;
+      };
 
-      // ---   process the realtime event   ---
-            if (ev.action === "create") {
-        // immediately re-fetch so `image` has a filename
+      /* -------- CREATE -------- */
+      if (ev.action === "create") {
+        // fetch the stored record (now has image filename)
         const full = await pb.collection("messages")
-                            .getOne(ev.record.id, { expand:"author" });
-        state.messages.push(full);
+                             .getOne(ev.record.id, { expand:"author" });
+        upsert(full);
+
+      /* -------- UPDATE -------- */
       } else if (ev.action === "update") {
-        const i = state.messages.findIndex(x => x.id === ev.record.id);
-        if (i > -1) state.messages[i] = ev.record;
+        let full = ev.record;
+        // if PocketBase didn’t include the filename yet, fetch it
+        if (!full.image || full.image === "") {
+          full = await pb.collection("messages")
+                         .getOne(ev.record.id, { expand:"author" });
+        }
+        upsert(full);
+
+      /* -------- DELETE -------- */
       } else if (ev.action === "delete") {
         state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
 
       draw();
 
-      // ---   snap to bottom only if the user was there already   ---
+      /* smart-scroll logic unchanged */
+      const wrap      = document.getElementById("msgwrap");
+      const atBottom  = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
       if (atBottom) wrap.scrollTop = wrap.scrollHeight;
     },
     { filter:`channel='${channelId}'`, expand:"author" }
   );
 }
+
 
 
 
