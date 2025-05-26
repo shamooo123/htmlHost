@@ -154,10 +154,22 @@ if (typeof user === "object" && user.avatar) {
      : "";
 
 
-  /* ---------- role icon ---------- */
-  const roleIcon =
-      typeof user === "object" && user.role === "admin"     ? "★" :
-      typeof user === "object" && user.role === "moderator" ? "☆" : "";
+  /* ---------- role badge ---------- */
+let roleBadge = "";
+if (typeof user === "object") {
+  if (user.role === "admin") {
+    roleBadge = html`
+      <span class="ml-1 text-xs font-semibold text-green-600">
+        (ADMIN)
+      </span>`;
+  } else if (user.role === "moderator") {
+    roleBadge = html`
+      <span class="ml-1 text-xs font-semibold text-green-600">
+        (MOD)
+      </span>`;
+  }
+}
+
 
   /* ---------- template ---------- */
   return html`
@@ -171,7 +183,7 @@ if (typeof user === "object" && user.avatar) {
               ? user.displayName || user.email
               : user       /* ← unlikely, but safe */}
         </span>
-        ${roleIcon ? html`<span class="ml-1 text-xs">${roleIcon}</span>` : ""}
+        ${roleBadge}
 
         <time class="ml-2 text-gray-500 text-xs">
            ${new Date(m.created).toLocaleString([], {
