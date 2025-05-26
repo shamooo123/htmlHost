@@ -419,13 +419,18 @@ upsert(rec);
         state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
 
-      draw();
+      
 
       /* smart-scroll: stay at bottom only if we were already there */
-      const wrap     = document.getElementById("msgwrap");
-      const atBottom =
-        wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40;
-      if (atBottom) wrap.scrollTop = wrap.scrollHeight;
+     /* ---------- was the user already at the bottom? ---------- */
+     const wrap     = document.getElementById("msgwrap");
+     const atBottom = wrap &&
+         (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
+
+       draw();
+
+            /* ---------- keep the user in place if they were there ---------- */
+     if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
     },
     { filter:`channel='${channelId}'`, expand:"author" }
   );
