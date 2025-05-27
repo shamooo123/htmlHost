@@ -517,36 +517,7 @@ async function loadMessages(channelId){
   setTimeout(() => {
     const wrap = document.getElementById("msgwrap");
     if (wrap) wrap.scrollTop = wrap.scrollHeight;
-  });
-}
-
-
-  /* ▶ refetch legacy records whose filename is still the placeholder */
-  await Promise.all(
-    list.map(async (m,i) => {
-      const isPlaceholder =
-        m.image === "image" ||
-        (Array.isArray(m.image) && m.image[0] === "image");
-
-      if (isPlaceholder) {
-        list[i] = await pb.collection("messages")
-                          .getOne(m.id, { expand:"author" });
-      }
-    })
-  );
-
-  /* ▶ normalise: keep only the first filename as a string */
-  list.forEach(m => {
-    if (Array.isArray(m.image)) m.image = m.image[0] || "";
-  });
-
-  const pinned = list.filter(m => m.pinned).sort(
-  (a,b) => new Date(a.created) - new Date(b.created)
-);
-setState({ messages:list, pinned });
-startPinRotation();
- 
-  //setState({ messages:list });
+  }); 
   subscribeMessages(channelId);
   setTimeout(()=>document.getElementById("msgwrap").scrollTop = 9e9);
 }
