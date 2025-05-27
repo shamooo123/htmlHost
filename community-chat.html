@@ -102,10 +102,18 @@ function chatUI(){
         ${isMod()? html`<button @click=${createChannel}>+</button>` : ""}
       </header>
       ${state.channels.map(c=>html`
-        <div @click=${()=>switchChannel(c)}
-             class="p-3 cursor-pointer ${state.current?.id===c.id?'bg-white font-semibold':''}">
-          # ${c.name}
-        </div>`)}
+        +<div
+  class="group p-3 cursor-pointer flex justify-between
+         ${state.current?.id===c.id?'bg-white font-semibold':''}"
+>
+  <span @click=${()=>switchChannel(c)}># ${c.name}</span>
+
+  ${isMod() ? html`
+    <span class="opacity-0 group-hover:opacity-100 space-x-1 text-xs">
+      <button @click=${()=>renameChannel(c)}   class="text-indigo-600">✎</button>
+      <button @click=${()=>deleteChannel(c)}  class="text-red-600">🗑</button>
+    </span>` : ""}
+</div>`)}
     </aside>
 
     <!-- messages + composer -->
@@ -281,8 +289,9 @@ function msgComposer() {
 async function createChannel(){
   const name = prompt("Channel name (no spaces)");
   if(!name) return;
-  const chan = await pb.collection("channels").create({name,createdBy:state.user.id});
-  setState({channels:[...state.channels,chan]});
+  const chan = await pb.collection("channels")
+                       .create({ name, createdBy:state.user.id });
+  await refreshChannels(chan.id);
 }
 function switchChannel(c){
   if(state.current?.id===c.id) return;
@@ -291,6 +300,21 @@ function switchChannel(c){
   loadMessages(c.id);
 }
 
+async function renameChannel(chan){
+  const name = prompt("New channel name", chan.name);
+  if(!name || name === chan.name) return;
+  await pb.collection("channels").update(chan.id, { name });
+  await refreshChannels(chan.id);
+}
+
+async function deleteChannel(chan){
+  if(!confirm(`Delete #${chan.name}?  All its messages will be removed.`)) return;
+  await pb.collection("channels").delete(chan.id);
+
+  /* after deletion pick first remaining channel (if any) */
+  await refreshChannels(state.channels[0]?.id);
+}
+   
 /* ---- helper: show preview when a file is picked ---- */
 function showPreview(e){
   const file = e.target.files[0];
@@ -393,6 +417,16 @@ function logout(){
   setState({user:null,channels:[],current:null,messages:[]});
 }
 const isMod = ()=>["moderator","admin"].includes(state.user?.role);
+
+/* quick helper: refresh the channel list after any CRUD op */
+async function refreshChannels(selectId = null){
+  state.channels = await pb.collection("channels").getFullList({ sort:"name" });
+  if (selectId){
+    const hit = state.channels.find(c => c.id === selectId);
+    if (hit) switchChannel(hit);      // jump to the new/renamed channel
+  }
+  setState({});
+}
 
 /* ---------- DATA LOADERS ---------- */
 async function loadChannels(){
