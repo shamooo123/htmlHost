@@ -138,6 +138,8 @@ function chatUI(){
     <main class="flex-1 flex flex-col">
       <header class="p-3 border-b bg-white font-semibold">
         ${state.current ? `#${state.current.name}` : "select a channel"}
+        <button @click=${openSettings}
+         class="mr-4 text-sm text-indigo-600">⚙︎ Settings</button>
         <button @click=${logout}
                 class="float-right text-red-600 text-sm">Log&nbsp;out</button>
       </header>
@@ -615,7 +617,116 @@ function startPinRotation() {
   }, 3000);
 }
 
+/* ───────── Settings dialog ───────── */
+function openSettings(){
 
+  /* ❷-A  build the backdrop & card  */
+  const modal = document.createElement("div");
+  modal.className =
+    "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
+
+  modal.innerHTML = `
+    <form id="setForm"
+          class="bg-white rounded-xl w-[90vw] max-w-sm p-6 space-y-4">
+
+      <h2 class="text-lg font-semibold text-center mb-2">Account settings</h2>
+
+      <!-- display name -->
+      <label class="block">
+        <span class="text-sm text-gray-600">Display name</span>
+        <input name="displayName" value="${state.user.displayName||""}"
+               class="mt-1 w-full p-2 border rounded">
+      </label>
+
+      <!-- avatar -->
+      <label class="block">
+        <span class="text-sm text-gray-600">Avatar</span>
+        <input name="avatar" type="file" accept="image/*"
+               class="mt-1 w-full">
+      </label>
+
+      <!-- password change -->
+      <fieldset class="border-t pt-4 space-y-3">
+        <legend class="text-sm font-medium">Change password</legend>
+        <input name="oldPass"  type="password" placeholder="Current password"
+               class="w-full p-2 border rounded">
+        <input name="newPass"  type="password" placeholder="New password"
+               class="w-full p-2 border rounded">
+        <input name="newPass2" type="password" placeholder="Confirm new password"
+               class="w-full p-2 border rounded">
+      </fieldset>
+
+      <!-- buttons -->
+      <div class="flex justify-between pt-4">
+        <button type="button" id="setCancel"
+                class="px-4 py-2 rounded border">Cancel</button>
+        <button class="px-4 py-2 bg-indigo-600 text-white rounded">
+          Save
+        </button>
+      </div>
+
+      <p id="setMsg" class="text-sm text-center text-red-600 mt-2 hidden"></p>
+    </form>`;
+
+  document.body.appendChild(modal);
+
+  /* ❷-B  wire up buttons ------------------------------------ */
+  modal.querySelector("#setCancel").onclick = ()=>document.body.removeChild(modal);
+  modal.querySelector("#setForm").onsubmit   = saveSettings;
+}
+
+/* ❷-C  form-handler  */
+async function saveSettings(e){
+  e.preventDefault();
+  const form  = e.target;
+  const msgEl = form.querySelector("#setMsg");
+  msgEl.classList.add("hidden");
+
+  const fd = new FormData(form);
+
+  /* 1.  display-name + avatar ------------------------------ */
+  if (fd.get("displayName")   == state.user.displayName)  fd.delete("displayName");
+  if (!fd.get("avatar") || fd.get("avatar").size === 0)   fd.delete("avatar");
+
+  if (fd.has("displayName") || fd.has("avatar")){
+    try{
+      await pb.collection("users").update(state.user.id, fd);
+    }catch(err){
+      msgEl.textContent = err?.message || "Failed to update profile";
+      return msgEl.classList.remove("hidden");
+    }
+  }
+
+  /* 2.  password change ------------------------------------ */
+  const oldP = fd.get("oldPass");   const n1 = fd.get("newPass");   const n2 = fd.get("newPass2");
+  if (oldP || n1 || n2){
+    if (!oldP || !n1 || n1!==n2){
+      msgEl.textContent = "Fill all password boxes (new passwords must match)";
+      return msgEl.classList.remove("hidden");
+    }
+    try{
+      await pb.collection("users").update(state.user.id,{
+        oldPassword : oldP,
+        password    : n1,
+        passwordConfirm: n1
+      });
+    }catch(err){
+      msgEl.textContent = err?.message || "Password change failed";
+      return msgEl.classList.remove("hidden");
+    }
+  }
+
+  /* reload the auth model so avatar / name update instantly */
+  await pb.collection("users").authRefresh();
+  setState({ user: pb.authStore.model });
+
+  /* close the dialog */
+  form.parentElement.remove();   // remove backdrop
+}
+
+<style>
+  #setForm input:invalid{ @apply border-red-500; }
+</style>
 
 
 
