@@ -466,12 +466,60 @@ async function loadChannels(){
   if(list.length) switchChannel(list[0]);
 }
    
+/* ----------------------------------------------------
+   fetch all messages for the selected channel,
+   normalise them, compute the pinned list,
+   then subscribe for realtime updates
+---------------------------------------------------- */
 async function loadMessages(channelId){
+
+  /* 1️⃣  grab everything that already exists */
   let list = await pb.collection("messages").getFullList({
     filter : `channel='${channelId}'`,
     expand : "author",
     sort   : "-pinned,created"
   });
+
+  /* 2️⃣  legacy fix: replace “image” placeholders with the real filename */
+  await Promise.all(
+    list.map(async (m,i) => {
+      const needsFix =
+        m.image === "image" ||
+        (Array.isArray(m.image) && m.image[0] === "image");
+
+      if (needsFix) {
+        list[i] = await pb.collection("messages")
+                          .getOne(m.id, { expand:"author" });
+      }
+    })
+  );
+
+  /* 3️⃣  normalise: ensure m.image is a *single* filename string */
+  list.forEach(m => {
+    if (Array.isArray(m.image)) m.image = m.image[0] || "";
+  });
+
+  /* 4️⃣  compute the pinned list and push everything into state */
+  const pinned = list
+    .filter(m => m.pinned)
+    .sort((a,b) => new Date(a.created) - new Date(b.created));
+
+  setState({ messages:list, pinned });
+
+  /* 5️⃣  (re)start the 3-second rotation of the banner */
+  startPinRotation();
+
+  /* 6️⃣  subscribe to realtime changes — **await** because the
+          fixed subscribeMessages is now async and returns a promise */
+  await subscribeMessages(channelId);
+
+  /* 7️⃣  scroll to the bottom once the DOM has rendered */
+  setTimeout(() => {
+    const wrap = document.getElementById("msgwrap");
+    if (wrap) wrap.scrollTop = wrap.scrollHeight;
+  });
+}
+
 
   /* ▶ refetch legacy records whose filename is still the placeholder */
   await Promise.all(
@@ -503,18 +551,24 @@ startPinRotation();
   setTimeout(()=>document.getElementById("msgwrap").scrollTop = 9e9);
 }
    
-function subscribeMessages(channelId){
+/* ─────────────────────────────────────────────── */
+/* only ONE copy of this function in the file     */
+/* ─────────────────────────────────────────────── */
+async function subscribeMessages(channelId){
+  /* ❶ store the unsubscribe fn that .subscribe returns */
   state.msgSub = await pb.collection("messages").subscribe(
     "*",
-    /* ------------ event handler ------------ */
+
+    /* ❷ realtime event-handler */
     async ev => {
-      /* helper: insert or replace a record in state.messages */
+      /* upsert helper ------------------------------ */
       const upsert = rec => {
         const i = state.messages.findIndex(x => x.id === rec.id);
-        i === -1 ? state.messages.push(rec) : state.messages[i] = rec;
+        i === -1 ? state.messages.push(rec)
+                 : state.messages[i] = rec;
       };
 
-      /* -------- CREATE -------- */
+      /* CREATE ------------------------------------ */
       if (ev.action === "create") {
         let rec = ev.record;
         if (!rec.image || rec.image === "image") {
@@ -524,7 +578,7 @@ function subscribeMessages(channelId){
         if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
         upsert(rec);
 
-      /* -------- UPDATE -------- */
+      /* UPDATE ------------------------------------ */
       } else if (ev.action === "update") {
         let rec = ev.record;
         if (!rec.image || rec.image === "image") {
@@ -534,31 +588,32 @@ function subscribeMessages(channelId){
         if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
         upsert(rec);
 
-      /* -------- DELETE -------- */
+      /* DELETE ------------------------------------ */
       } else if (ev.action === "delete") {
         state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
 
-      /* ------------- recompute pinned list ------------- */
+      /* recompute pinned -------------------------- */
       state.pinned = state.messages
         .filter(m => m.pinned)
         .sort((a,b) => new Date(a.created) - new Date(b.created));
+      startPinRotation();
 
-      startPinRotation();                 // (re)start 3-sec cycle
-
-      /* ------------- smart-scroll ------------- */
-      const wrap = document.getElementById("msgwrap");
+      /* smart-scroll ------------------------------ */
+      const wrap     = document.getElementById("msgwrap");
       const atBottom = wrap &&
         (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
 
-      /* 🔑 trigger redraw (banner etc.) */
       setState({ messages: state.messages, pinned: state.pinned });
 
       if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
     },
+
+    /* subscribe options */
     { filter:`channel='${channelId}'`, expand:"author" }
   );
 }
+
 
 
 function startPinRotation() {
