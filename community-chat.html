@@ -102,7 +102,7 @@ function chatUI(){
         ${isMod()? html`<button @click=${createChannel}>+</button>` : ""}
       </header>
       ${state.channels.map(c=>html`
-        +<div
+        <div
   class="group p-3 cursor-pointer flex justify-between
          ${state.current?.id===c.id?'bg-white font-semibold':''}"
 >
@@ -293,12 +293,41 @@ async function createChannel(){
                        .create({ name, createdBy:state.user.id });
   await refreshChannels(chan.id);
 }
+   
 function switchChannel(c){
-  if(state.current?.id===c.id) return;
-  if(state.msgSub) state.msgSub();
-  setState({current:c,messages:[]});
+ if (state.current?.id === c.id) return;   // already there
+  if (state.msgSub) state.msgSub();         // stop SSE for old channel
+
+  /* clear the view immediately for snappier feedback */
+  setState({ current:c, messages:[], pinned:[] });
+
+  /* then load the new channel’s history */
   loadMessages(c.id);
 }
+
+   /* render ONE channel row  –  whole row is clickable,
+   but the ✎ / 🗑 icons stop the click bubbling */
+function channelRow(c){
+  const isCurrent = c.id === state.current?.id;
+
+  return html`
+    <div
+      class="group flex justify-between items-center p-3
+             cursor-pointer ${isCurrent ? 'bg-white font-semibold' : ''}"
+      @click=${() => switchChannel(c)}
+    >
+      <span># ${c.name}</span>
+
+      ${isMod() ? html`
+        <span class="opacity-0 group-hover:opacity-100 space-x-1 text-xs">
+          <button  @click=${e => {e.stopPropagation(); renameChannel(c);} }
+                   class="text-indigo-600">✎</button>
+          <button  @click=${e => {e.stopPropagation(); deleteChannel(c);} }
+                   class="text-red-600">🗑</button>
+        </span>` : ""}
+    </div>`;
+}
+
 
 async function renameChannel(chan){
   const name = prompt("New channel name", chan.name);
@@ -421,11 +450,12 @@ const isMod = ()=>["moderator","admin"].includes(state.user?.role);
 /* quick helper: refresh the channel list after any CRUD op */
 async function refreshChannels(selectId = null){
   state.channels = await pb.collection("channels").getFullList({ sort:"name" });
+setState({});                       // re-render list first
+
   if (selectId){
     const hit = state.channels.find(c => c.id === selectId);
-    if (hit) switchChannel(hit);      // jump to the new/renamed channel
+    if (hit) switchChannel(hit);      // then actually switch
   }
-  setState({});
 }
 
 /* ---------- DATA LOADERS ---------- */
