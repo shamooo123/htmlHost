@@ -53,6 +53,8 @@ function authUI(){
              required class="w-full p-2 border rounded">
       <button class="w-full py-2 bg-indigo-600 text-white rounded">Log&nbsp;in</button>
     </form>
+    ${state.loginErr ? html`
+  <p class="mt-2 text-center text-red-600 text-sm">${state.loginErr}</p>` : ""}
     <p class="text-sm text-center mt-4">
       No account?
       <a @click=${()=>setState({showSignup:true})}
@@ -63,25 +65,31 @@ function authUI(){
 
 function signupForm(){ return html`
   <form @submit=${signupEmail} class="space-y-3 mt-4 border-t pt-4">
-    <input name="fullname"   placeholder="Full name"     required
++   <input name="fullname" placeholder="Full name" required
++          class="w-full p-2 border rounded">
+    <input name="display"  placeholder="Display name" required
            class="w-full p-2 border rounded">
-    <input name="display"    placeholder="Display name"  required
+    <input name="email"    type="email"    placeholder="Email"    required
            class="w-full p-2 border rounded">
-    <input name="email"      type="email"    placeholder="Email"    required
-           class="w-full p-2 border rounded">
-    <input name="password"   type="password" placeholder="Password" required
+    <input name="password" type="password" placeholder="Password" required
            class="w-full p-2 border rounded">
     <button class="w-full py-2 bg-green-600 text-white rounded">
       Create&nbsp;account
     </button>
   </form>`; }
 
+
 async function loginEmail(e){
   e.preventDefault();
   const f = Object.fromEntries(new FormData(e.target));
-  await pb.collection("users").authWithPassword(f.email,f.password);
-  setState({user:pb.authStore.model,showSignup:false});
-  loadChannels();
+  try{
+    await pb.collection("users").authWithPassword(f.email, f.password);
+    setState({ user: pb.authStore.model, showSignup:false, loginErr:null });
+    loadChannels();
+  }catch(err){
+    /* show a friendly message under the form */
+    setState({ loginErr:"Wrong e-mail or password" });
+  }
 }
 async function signupEmail(e){
   e.preventDefault();
