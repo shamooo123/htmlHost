@@ -296,8 +296,9 @@ async function createChannel(){
    
 function switchChannel(c){
  if (state.current?.id === c.id) return;   // already there
-  if (state.msgSub) state.msgSub();         // stop SSE for old channel
-
+ if (typeof state.msgSub === "function") {         // stop SSE for old channel
+   state.msgSub(); 
+ }
   /* clear the view immediately for snappier feedback */
   setState({ current:c, messages:[], pinned:[] });
 
@@ -503,7 +504,7 @@ startPinRotation();
 }
    
 function subscribeMessages(channelId){
-  state.msgSub = pb.collection("messages").subscribe(
+  state.msgSub = await pb.collection("messages").subscribe(
     "*",
     /* ------------ event handler ------------ */
     async ev => {
