@@ -447,7 +447,7 @@ function subscribeMessages(channelId){
     "*",
     /* ------------ event handler ------------ */
     async ev => {
-      /* helper: insert or replace a record */
+      /* helper: insert or replace a record in state.messages */
       const upsert = rec => {
         const i = state.messages.findIndex(x => x.id === rec.id);
         i === -1 ? state.messages.push(rec) : state.messages[i] = rec;
@@ -478,35 +478,21 @@ function subscribeMessages(channelId){
         state.messages = state.messages.filter(x => x.id !== ev.record.id);
       }
 
-      /* recompute pinned + maybe restart rotation */
-      state.pinned = state.messages.filter(m => m.pinned).sort(
-        (a,b) => new Date(a.created) - new Date(b.created)
-      );
+      /* ------------- recompute pinned list ------------- */
+      state.pinned = state.messages
+        .filter(m => m.pinned)
+        .sort((a,b) => new Date(a.created) - new Date(b.created));
 
-      /* -------- after we change state.messages -------- */
-state.pinned = state.messages
-  .filter(m => m.pinned)
-  .sort((a,b) => new Date(a.created) - new Date(b.created));
+      startPinRotation();                 // (re)start 3-sec cycle
 
-startPinRotation();
-
-/* smart-scroll flag BEFORE we update the DOM */
-const wrap     = document.getElementById("msgwrap");
-const atBottom = wrap &&
-  (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
-
-/* 🔑 let setState() re-render everything, including the banner */
-setState({ messages: state.messages, pinned: state.pinned });
-
-/* keep user at bottom if they were there */
-if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
-
-      /* smart-scroll */
-      const wrap     = document.getElementById("msgwrap");
+      /* ------------- smart-scroll ------------- */
+      const wrap = document.getElementById("msgwrap");
       const atBottom = wrap &&
         (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
 
-      draw();
+      /* 🔑 trigger redraw (banner etc.) */
+      setState({ messages: state.messages, pinned: state.pinned });
+
       if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
     },
     { filter:`channel='${channelId}'`, expand:"author" }
