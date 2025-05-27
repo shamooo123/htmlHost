@@ -120,10 +120,12 @@ function chatUI(){
          class="relative flex-1 p-4 overflow-y-auto space-y-3 bg-white">
 
      ${state.pinned.length ? html`
-  <div class="border border-indigo-300 bg-indigo-50 px-3 py-1
+  <div class="sticky top-0 z-10  /* <-- NEW */
+            border border-indigo-300 bg-indigo-50
+            rounded-md px-3 py-1
             text-sm cursor-pointer select-none
-            overflow-hidden whitespace-nowrap text-ellipsis
-            rounded-md">          <!-- ← add rounded-* here -->
+            overflow-hidden whitespace-nowrap text-ellipsis"
+     @click=${togglePinBanner}>
   📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
 </div>` : ""}
 
@@ -480,7 +482,24 @@ function subscribeMessages(channelId){
       state.pinned = state.messages.filter(m => m.pinned).sort(
         (a,b) => new Date(a.created) - new Date(b.created)
       );
-      startPinRotation();
+
+      /* -------- after we change state.messages -------- */
+state.pinned = state.messages
+  .filter(m => m.pinned)
+  .sort((a,b) => new Date(a.created) - new Date(b.created));
+
+startPinRotation();
+
+/* smart-scroll flag BEFORE we update the DOM */
+const wrap     = document.getElementById("msgwrap");
+const atBottom = wrap &&
+  (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
+
+/* 🔑 let setState() re-render everything, including the banner */
+setState({ messages: state.messages, pinned: state.pinned });
+
+/* keep user at bottom if they were there */
+if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
 
       /* smart-scroll */
       const wrap     = document.getElementById("msgwrap");
