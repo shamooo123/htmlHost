@@ -63,11 +63,13 @@ function authUI(){
 
 function signupForm(){ return html`
   <form @submit=${signupEmail} class="space-y-3 mt-4 border-t pt-4">
-    <input name="name"     placeholder="Display name" required
+    <input name="fullname"   placeholder="Full name"     required
            class="w-full p-2 border rounded">
-    <input name="email"    type="email"    placeholder="Email"    required
+    <input name="display"    placeholder="Display name"  required
            class="w-full p-2 border rounded">
-    <input name="password" type="password" placeholder="Password" required
+    <input name="email"      type="email"    placeholder="Email"    required
+           class="w-full p-2 border rounded">
+    <input name="password"   type="password" placeholder="Password" required
            class="w-full p-2 border rounded">
     <button class="w-full py-2 bg-green-600 text-white rounded">
       Create&nbsp;account
@@ -83,13 +85,21 @@ async function loginEmail(e){
 }
 async function signupEmail(e){
   e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target));
+  const f = Object.fromEntries(new FormData(e.target));   // collect all 4 values
+
   await pb.collection("users").create({
-    email:f.email,password:f.password,passwordConfirm:f.password,
-    displayName:f.name,role:"member"
+    email           : f.email,
+    password        : f.password,
+    passwordConfirm : f.password,
+    name            : f.fullname,     // real name (auth collection already has “name”)
+    displayName     : f.display,      // public nickname
+    role            : "member"
   });
-  await loginEmail({preventDefault(){},target:e.target});
+
+  /* immediately log-in the new user */
+  await loginEmail({ preventDefault(){}, target:e.target });
 }
+
 
 /* ---------- CHAT SCREENS ---------- */
 function chatUI(){
