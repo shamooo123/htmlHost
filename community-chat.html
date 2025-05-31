@@ -705,91 +705,96 @@ async function saveSettings(e){
   e.preventDefault();
   const form  = e.target;
   const msgEl = form.querySelector("#setMsg");
-  msgEl.classList.add("hidden");
-  msgEl.classList.remove("text-green-600","text-red-600");
+
+  /* reset feedback area */
+  msgEl.className = "text-sm text-center mt-2 hidden";
+  msgEl.textContent = "";
 
   const fd = new FormData(form);
 
-  /* ---------------- profile fields (avatar + display name) ---------------- */
+  /* ---------- 1. avatar + display-name ------------------------------- */
   if (fd.get("displayName") === state.user.displayName) fd.delete("displayName");
   if (!fd.get("avatar") || fd.get("avatar").size === 0) fd.delete("avatar");
 
-  /* we’ll apply profile changes first, password after the checks */
   try{
     if (fd.has("displayName") || fd.has("avatar")){
       await pb.collection("users").update(state.user.id, fd);
     }
   }catch(err){
-    msgEl.textContent = err.message || "Profile update failed";
-    msgEl.classList.add("text-red-600");
-    return msgEl.classList.remove("hidden");
+    return showErr(err?.message || "Profile update failed.");
   }
 
-  /* ---------------- password change logic ---------------- */
+  /* ---------- 2. password ------------------------------------------- */
   const oldP = fd.get("oldPass"),
         n1   = fd.get("newPass"),
         n2   = fd.get("newPass2");
 
-  let pwdChanged = false;          // flag so we can tailor the success message
+  let pwdChanged = false;
 
   if (oldP || n1 || n2){
-    /* quick client-side checks */
+    /* client-side checks */
     if (!oldP || !n1 || !n2){
-      msgEl.textContent = "Fill in *all* three password boxes.";
-      msgEl.classList.add("text-red-600");
-      return msgEl.classList.remove("hidden");
+      return showErr("Fill in all three password boxes.");
     }
     if (n1 !== n2){
-      msgEl.textContent = "New passwords don’t match — password **not** changed.";
-      msgEl.classList.add("text-red-600");
-      return msgEl.classList.remove("hidden");
+      return showErr("New passwords don’t match — password not changed.");
     }
 
-    /* server-side update */
+    /* server patch */
     try{
       await pb.collection("users").update(state.user.id,{
         oldPassword     : oldP,
         password        : n1,
         passwordConfirm : n1
       });
-      pwdChanged = true;
-    }catch(err){
-      /* PB usually returns a field-specific error; fall back to generic text */
-      const msg =
-        (err?.response?.data?.oldPassword?.message)    ? "Current password is wrong." :
-        (err?.response?.data?.password?.message)       ? err.response.data.password.message :
-        err?.message || "Password change failed.";
 
-      msgEl.textContent = `${msg}  Password **not** changed.`;
-      msgEl.classList.add("text-red-600");
-      return msgEl.classList.remove("hidden");
+      /* re-login with NEW password so we get a fresh token */
+      await pb.collection("users").authWithPassword(state.user.email, n1);
+      pwdChanged = true;
+
+      /* blank the three inputs */
+      form.oldPass.value = form.newPass.value = form.newPass2.value = "";
+
+    }catch(err){
+      const msg =
+        err?.response?.data?.oldPassword?.message ? "Current password is wrong."
+        : err?.message || "Password change failed.";
+      return showErr(`${msg}  Password not changed.`);
     }
   }
 
-  /* ---------------- refresh auth + live-update avatars ---------------- */
-  await pb.collection("users").authRefresh();
-  const newAvatar = pb.authStore.model.avatar;
-  state.messages.forEach(m=>{
-    if (m.author===state.user.id || m.expand?.author?.id===state.user.id){
-      if (m.expand?.author) m.expand.author.avatar = newAvatar;
-    }
-  });
-  setState({ user:pb.authStore.model });
+  /* ---------- 3. refresh + live-update avatars ----------------------- */
+  try{
+    await pb.collection("users").authRefresh();
 
-  /* ---------------- final success message ---------------- */
+    /* update avatar shown in already-rendered messages */
+    const newAvatar = pb.authStore.model.avatar;
+    state.messages.forEach(m=>{
+      if (m.author === state.user.id || m.expand?.author?.id === state.user.id){
+        if (m.expand?.author) m.expand.author.avatar = newAvatar;
+      }
+    });
+    setState({ user: pb.authStore.model });
+
+  }catch(err){
+    return showErr("Profile saved, but session refresh failed — please log in again.");
+  }
+
+  /* ---------- success feedback & auto-close -------------------------- */
   msgEl.textContent =
-    (pwdChanged ? "Password updated. " : "") +
-    "Profile saved ✔︎";
-  msgEl.classList.add("text-green-600");
+    (pwdChanged ? "Password updated. " : "") + "Profile saved ✔︎";
   msgEl.classList.remove("hidden");
+  msgEl.classList.add("text-green-600");
 
-  /* close dialog after a moment */
   setTimeout(()=>form.parentElement.remove(), 1200);
+
+  /* ---------- local helper ------------------------------------------ */
+  function showErr(txt){
+    msgEl.textContent = txt;
+    msgEl.classList.remove("hidden");
+    msgEl.classList.add("text-red-600");
+  }
 }
-
-
-
-
 
 
 /* ---------- INIT ---------- */
