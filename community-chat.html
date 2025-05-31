@@ -763,27 +763,36 @@ async function saveSettings(e){
     }
   }
 
- /* ---------- 3. refresh + live-update avatars ----------------------- */
+/* ---------- 3. refresh + live-update avatar + display-name ---------- */
 try{
   await pb.collection("users").authRefresh();
 
-  /* update avatar AND display name in already-rendered messages */
-  const me = pb.authStore.model;          // fresh copy of *you*
-  state.messages.forEach(m=>{
-    if (m.author === me.id || m.expand?.author?.id === me.id){
-      if (m.expand?.author){
-        m.expand.author.avatar       = me.avatar;        // avatar
-        m.expand.author.displayName  = me.displayName;   // ⚡ name
-      }
+  const me = pb.authStore.model;               // fresh copy of *you*
+
+  /* patch every already-rendered message that belongs to me */
+  state.messages.forEach(m => {
+    const a = m.expand?.author;
+    if (a && a.id === me.id){
+      a.avatar      = me.avatar;
+      a.displayName = me.displayName;
     }
   });
 
-  /* show the new name in the header, composer, etc. */
-  setState({ user: me });
+  /* ⬅︎ GIVE setState *new* references so Lit knows something changed */
+  setState({
+    user     : me,
+    messages : [...state.messages]   // <-- shallow copy = new ref
+  });
+
+  msgEl.textContent = "Profile saved ✔︎";
+  msgEl.classList.add("text-green-600");
+  msgEl.classList.remove("hidden");
+  setTimeout(() => form.parentElement.remove(), 1200);
 
 }catch(err){
-  return showErr("Profile saved, but session refresh failed — please log in again.");
+  showErr("Profile saved, but session refresh failed — please log in again.");
 }
+
 
 
   /* ---------- success feedback & auto-close -------------------------- */
