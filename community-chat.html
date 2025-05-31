@@ -136,13 +136,21 @@ function chatUI(){
 
     <!-- messages + composer -->
     <main class="flex-1 flex flex-col">
-      <header class="p-3 border-b bg-white font-semibold">
-        ${state.current ? `#${state.current.name}` : "select a channel"}
-        <button @click=${openSettings}
-         class="mr-4 text-sm text-indigo-600">⚙︎ Settings</button>
-        <button @click=${logout}
-                class="float-right text-red-600 text-sm">Log&nbsp;out</button>
-      </header>
+      <header class="p-3 border-b bg-white font-semibold flex justify-between">
+
+   <!-- left : channel title -->
+   <span>
+     ${state.current ? `#${state.current.name}` : "select a channel"}
+   </span>
+
+   <!-- right : stacked buttons -->
+   <span class="flex items-center gap-4">
+     <button @click=${openSettings}
+             class="text-sm text-indigo-600">⚙︎ Settings</button>
+     <button @click=${logout}
+             class="text-sm text-red-600">Log&nbsp;out</button>
+   </span>
+ </header>
 
       <section id="msgwrap"
          class="relative flex-1 p-4 overflow-y-auto space-y-3 bg-white">
