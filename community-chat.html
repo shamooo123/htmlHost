@@ -700,6 +700,7 @@ function openSettings() {
 }
 
 /* ───────── saveSettings ───────── */
+/* ───────── saveSettings (with detailed password messages) ───────── */
 async function saveSettings(e){
   e.preventDefault();
   const form  = e.target;
@@ -709,49 +710,81 @@ async function saveSettings(e){
 
   const fd = new FormData(form);
 
-  /* ------- profile fields ------- */
+  /* ---------------- profile fields (avatar + display name) ---------------- */
   if (fd.get("displayName") === state.user.displayName) fd.delete("displayName");
   if (!fd.get("avatar") || fd.get("avatar").size === 0) fd.delete("avatar");
 
+  /* we’ll apply profile changes first, password after the checks */
   try{
     if (fd.has("displayName") || fd.has("avatar")){
       await pb.collection("users").update(state.user.id, fd);
     }
+  }catch(err){
+    msgEl.textContent = err.message || "Profile update failed";
+    msgEl.classList.add("text-red-600");
+    return msgEl.classList.remove("hidden");
+  }
 
-    /* ------- password (optional) ------- */
-    const o = fd.get("oldPass"), n1 = fd.get("newPass"), n2 = fd.get("newPass2");
-    if (o || n1 || n2){
-      if (!o || !n1 || n1!==n2)
-        throw new Error("Fill all password boxes & make sure the new passwords match");
+  /* ---------------- password change logic ---------------- */
+  const oldP = fd.get("oldPass"),
+        n1   = fd.get("newPass"),
+        n2   = fd.get("newPass2");
 
-      await pb.collection("users").update(state.user.id,{
-        oldPassword:o, password:n1, passwordConfirm:n1
-      });
+  let pwdChanged = false;          // flag so we can tailor the success message
+
+  if (oldP || n1 || n2){
+    /* quick client-side checks */
+    if (!oldP || !n1 || !n2){
+      msgEl.textContent = "Fill in *all* three password boxes.";
+      msgEl.classList.add("text-red-600");
+      return msgEl.classList.remove("hidden");
+    }
+    if (n1 !== n2){
+      msgEl.textContent = "New passwords don’t match — password **not** changed.";
+      msgEl.classList.add("text-red-600");
+      return msgEl.classList.remove("hidden");
     }
 
-    /* refresh auth model & locally replace avatars in existing messages */
-    await pb.collection("users").authRefresh();
-    const newAvatar = pb.authStore.model.avatar;
-    state.messages.forEach(m=>{
-      if (m.author===state.user.id || m.expand?.author?.id===state.user.id){
-        if (m.expand?.author) m.expand.author.avatar = newAvatar;
-      }
-    });
-    setState({ user:pb.authStore.model });   // redraw chat
+    /* server-side update */
+    try{
+      await pb.collection("users").update(state.user.id,{
+        oldPassword     : oldP,
+        password        : n1,
+        passwordConfirm : n1
+      });
+      pwdChanged = true;
+    }catch(err){
+      /* PB usually returns a field-specific error; fall back to generic text */
+      const msg =
+        (err?.response?.data?.oldPassword?.message)    ? "Current password is wrong." :
+        (err?.response?.data?.password?.message)       ? err.response.data.password.message :
+        err?.message || "Password change failed.";
 
-    /* success feedback */
-    msgEl.textContent = "Profile updated ✔︎";
-    msgEl.classList.add("text-green-600");
-    msgEl.classList.remove("hidden");
-
-    /* auto-close after a second */
-    setTimeout(()=>form.parentElement.remove(), 1000);
-
-  }catch(err){
-    msgEl.textContent = err.message || "Update failed";
-    msgEl.classList.add("text-red-600");
-    msgEl.classList.remove("hidden");
+      msgEl.textContent = `${msg}  Password **not** changed.`;
+      msgEl.classList.add("text-red-600");
+      return msgEl.classList.remove("hidden");
+    }
   }
+
+  /* ---------------- refresh auth + live-update avatars ---------------- */
+  await pb.collection("users").authRefresh();
+  const newAvatar = pb.authStore.model.avatar;
+  state.messages.forEach(m=>{
+    if (m.author===state.user.id || m.expand?.author?.id===state.user.id){
+      if (m.expand?.author) m.expand.author.avatar = newAvatar;
+    }
+  });
+  setState({ user:pb.authStore.model });
+
+  /* ---------------- final success message ---------------- */
+  msgEl.textContent =
+    (pwdChanged ? "Password updated. " : "") +
+    "Profile saved ✔︎";
+  msgEl.classList.add("text-green-600");
+  msgEl.classList.remove("hidden");
+
+  /* close dialog after a moment */
+  setTimeout(()=>form.parentElement.remove(), 1200);
 }
 
 
