@@ -763,22 +763,28 @@ async function saveSettings(e){
     }
   }
 
-  /* ---------- 3. refresh + live-update avatars ----------------------- */
-  try{
-    await pb.collection("users").authRefresh();
+ /* ---------- 3. refresh + live-update avatars ----------------------- */
+try{
+  await pb.collection("users").authRefresh();
 
-    /* update avatar shown in already-rendered messages */
-    const newAvatar = pb.authStore.model.avatar;
-    state.messages.forEach(m=>{
-      if (m.author === state.user.id || m.expand?.author?.id === state.user.id){
-        if (m.expand?.author) m.expand.author.avatar = newAvatar;
+  /* update avatar AND display name in already-rendered messages */
+  const me = pb.authStore.model;          // fresh copy of *you*
+  state.messages.forEach(m=>{
+    if (m.author === me.id || m.expand?.author?.id === me.id){
+      if (m.expand?.author){
+        m.expand.author.avatar       = me.avatar;        // avatar
+        m.expand.author.displayName  = me.displayName;   // ⚡ name
       }
-    });
-    setState({ user: pb.authStore.model });
+    }
+  });
 
-  }catch(err){
-    return showErr("Profile saved, but session refresh failed — please log in again.");
-  }
+  /* show the new name in the header, composer, etc. */
+  setState({ user: me });
+
+}catch(err){
+  return showErr("Profile saved, but session refresh failed — please log in again.");
+}
+
 
   /* ---------- success feedback & auto-close -------------------------- */
   msgEl.textContent =
