@@ -168,13 +168,28 @@ function chatUI(){
    </span>
  </header>
 
-      <section id="msgwrap"
+      <!-- 1️⃣ leave this line exactly as is -->
+<!-- messages list -->
+<section id="msgwrap"
          class="relative flex-1 p-4 overflow-y-auto space-y-3 bg-white">
 
+  <!-- pinned-banner (only if something is pinned) -->
+  ${state.pinned.length ? html`
+    <div class="sticky top-0 z-10 border border-indigo-300 bg-indigo-50
+                rounded-md px-3 py-1 text-sm cursor-pointer select-none
+                overflow-hidden whitespace-nowrap text-ellipsis"
+         @click=${togglePinBanner}>
+      📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
+    </div>` : ""}
 
-  📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
-</div>` : ""}
-      </section>
+  ${state.messages.filter(m => m.pinned).map(renderMsg)}
+  ${state.messages.filter(m => !m.pinned).map(renderMsg)}
+</section>
+
+
+
+
+
 
       ${state.current ? msgComposer() : ""}
     </main>
@@ -558,7 +573,7 @@ async function loadMessages(channelId){
     const wrap = document.getElementById("msgwrap");
     if (wrap) wrap.scrollTop = wrap.scrollHeight;
   }); 
-  subscribeMessages(channelId);
+ 
   setTimeout(()=>document.getElementById("msgwrap").scrollTop = 9e9);
 }
    
