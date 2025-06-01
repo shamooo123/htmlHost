@@ -171,21 +171,9 @@ function chatUI(){
       <section id="msgwrap"
          class="relative flex-1 p-4 overflow-y-auto space-y-3 bg-white">
 
-     ${state.pinned.length ? html`
-  <div class="sticky top-0 z-10 border border-indigo-300 bg-indigo-50
-              rounded-md px-3 py-1 text-sm cursor-pointer select-none
-              overflow-hidden whitespace-nowrap text-ellipsis"
-       @click=${togglePinBanner}>
-    📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
-  </div>` : ""}
-
 
   📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
 </div>` : ""}
-
-
-        ${state.messages.filter(m=>m.pinned).map(renderMsg)}
-        ${state.messages.filter(m=>!m.pinned).map(renderMsg)}
       </section>
 
       ${state.current ? msgComposer() : ""}
