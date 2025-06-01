@@ -5,6 +5,14 @@
 <script src="https://cdn.tailwindcss.com"></script>
 
 <script type="module">
+   <style>
+  /* small utility so we don’t repeat Tailwind classes  */
+  .btn-surface{
+    @apply rounded flex items-center justify-center
+           transition hover:bg-indigo-50 active:bg-indigo-100;
+  }
+</style>
+
 /* ----------------------------------------------------
    CONFIGURATION
 ---------------------------------------------------- */
@@ -112,27 +120,31 @@ async function signupEmail(e){
 /* ---------- CHAT SCREENS ---------- */
 function chatUI(){
   return html`
-  <div class="flex h-[600px] border rounded overflow-hidden bg-gray-50">
-    <!-- channels -->
-    <aside class="w-56 bg-gray-100 border-r overflow-y-auto">
+ <div class="flex h-[600px] border rounded overflow-hidden bg-gray-50">
+
+  <!-- hamburger (absolute so it stays visible when sidebar is closed) -->
+  <button @click=${toggleSidebar}
+          class="absolute z-20 m-2 btn-surface p-2">
+    <!-- three-line icon given by you -->
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none"
+         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+         class="w-5 h-5">
+      <path stroke-linecap="round" stroke-linejoin="round"
+            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+    </svg>
+  </button>
+
+  <!-- channels (width 56 when open, width 0 when closed) -->
+  <aside class="${state.showSidebar ? 'w-56' : 'w-0'} transition-all
+                 bg-gray-100 border-r overflow-y-auto">
+    ${state.showSidebar ? html`
       <header class="p-3 font-semibold flex justify-between items-center">
         Channels
         ${isMod()? html`<button @click=${createChannel}>+</button>` : ""}
       </header>
-      ${state.channels.map(c=>html`
-        <div
-  class="group p-3 cursor-pointer flex justify-between
-         ${state.current?.id===c.id?'bg-white font-semibold':''}"
->
-  <span @click=${()=>switchChannel(c)}># ${c.name}</span>
-
-  ${isMod() ? html`
-    <span class="opacity-0 group-hover:opacity-100 space-x-1 text-xs">
-      <button @click=${()=>renameChannel(c)}   class="text-indigo-600">✎</button>
-      <button @click=${()=>deleteChannel(c)}  class="text-red-600">🗑</button>
-    </span>` : ""}
-</div>`)}
-    </aside>
+      ${state.channels.map(channelRow)}
+    ` : ""}
+  </aside>
 
     <!-- messages + composer -->
     <main class="flex-1 flex flex-col">
@@ -145,10 +157,18 @@ function chatUI(){
 
    <!-- right : stacked buttons -->
    <span class="flex items-center gap-4">
-     <button @click=${openSettings}
-             class="text-sm text-indigo-600">⚙︎ Settings</button>
-     <button @click=${logout}
-             class="text-sm text-red-600">Log&nbsp;out</button>
+     <!-- Settings -->
+<button @click=${openSettings}
+        class="btn-surface mr-2 px-3 py-1.5 text-sm text-indigo-600">
+  ⚙︎ Settings
+</button>
+
+<!-- Log-out -->
+<button @click=${logout}
+        class="btn-surface px-3 py-1.5 text-sm text-red-600">
+  Log&nbsp;out
+</button>
+
    </span>
  </header>
 
@@ -162,6 +182,11 @@ function chatUI(){
             text-sm cursor-pointer select-none
             overflow-hidden whitespace-nowrap text-ellipsis"
      @click=${togglePinBanner}>
+     const state = {
+  /* …existing fields… */
+  showSidebar : true            // ← new
+};
+
   📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
 </div>` : ""}
 
@@ -265,6 +290,12 @@ if (typeof user === "object") {
     </div>
   </article>`;
 }
+
+   
+   function toggleSidebar(){
+  setState({ showSidebar: !state.showSidebar });
+}
+
 
 
 
