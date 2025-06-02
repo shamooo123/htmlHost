@@ -200,7 +200,8 @@ function chatUI(){
       <!-- 1️⃣ leave this line exactly as is -->
 <!-- messages list -->
 <section id="msgwrap"
-         class="relative flex-1 p-4 overflow-y-auto space-y-3 bg-white">
+          class="relative flex-1 p-4 pb-24 sm:pb-4
+                         overflow-y-auto space-y-3 bg-white">
 
   <!-- pinned-banner (only if something is pinned) -->
   ${state.pinned.length ? html`
@@ -357,7 +358,8 @@ function canPostToCurrent(){
 /* ---------- composer with live preview (pretty paper-clip) ---------- */
 function msgComposer() {
   return html`
-    <form … class="flex flex-col gap-2 border-t p-3 bg-gray-50
+    <form @submit=${sendMsg}
+         class="flex flex-col gap-2 border-t p-3 bg-gray-50
                     sm:static fixed inset-x-0 bottom-0 z-20">
 
       <!-- preview (hidden until a file is chosen) -->
