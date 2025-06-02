@@ -1,5 +1,5 @@
 <!--  ==== COMMUNITY CHAT (PocketBase + Tailwind) ====  -->
-<div id="pb-chat" style="min-height:600px"></div>
+<div id="pb-chat" class="w-full" style="height:66vh"></div>
 
 <!-- Tailwind ─ loads instantly from the official CDN -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -134,7 +134,7 @@ async function signupEmail(e){
 /* ---------- CHAT SCREENS ---------- */
 function chatUI(){
   return html`
-  <div class="flex flex-col sm:flex-row h-full sm:h-[600px]
+  <div class="flex flex-col sm:flex-row w-full h-full sm:h-[66vh]
             border rounded overflow-hidden bg-white">
 
   <!-- hamburger (absolute so it stays visible when sidebar is closed) -->
