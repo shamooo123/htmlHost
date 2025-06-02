@@ -661,79 +661,157 @@ function startPinRotation() {
   }, 3000);
 }
 
+ const isAdmin = () => state.user?.role === "admin";
+
 /* ───────── Settings dialog ───────── */
 /* ───────── Settings dialog ───────── */
-function openSettings() {
+/* ───────── Settings dialog (now with channel management) ───────── */
+function openSettings () {
   /* backdrop */
   const modal = document.createElement("div");
   modal.className =
     "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
 
-  /* card */
-  const user  = state.user;
-  const avatarURL = user.avatar
-    ? `${PB_URL}/api/files/_pb_users_auth_/${user.id}/${user.avatar}?thumb=128x128`
-    : "";
+  /* current user & avatar url */
+  const me        = state.user;
+  const avatarURL = me.avatar
+      ? `${PB_URL}/api/files/_pb_users_auth_/${me.id}/${me.avatar}?thumb=128x128`
+      : "";
 
+  /* build the modal ---------------------------------------------- */
   modal.innerHTML = /*html*/`
     <form id="setForm"
-          class="bg-white rounded-xl w-[90vw] max-w-sm p-6 space-y-4">
+          class="bg-white rounded-xl w-[90vw] max-w-lg p-6 space-y-6">
 
-      <h2 class="text-lg font-semibold text-center mb-4">Account settings</h2>
+      <h2 class="text-lg font-semibold text-center">Account settings</h2>
 
-      <!-- avatar -->
-      <div class="flex items-center gap-4">
-        <img id="setAvatarPrev" src="${avatarURL}"
-             class="w-16 h-16 rounded-full object-cover border" >
-        <label class="flex-1">
-          <span class="text-sm text-gray-600">Change avatar</span>
-          <input name="avatar" type="file" accept="image/*"
-                 class="mt-1 w-full" >
+      <!-- ░░░░░░  PROFILE  ░░░░░░ -->
+      <section class="space-y-4">
+        <!-- avatar -->
+        <div class="flex items-center gap-4">
+          <img  id="setAvatarPrev" src="${avatarURL}"
+                class="w-16 h-16 rounded-full object-cover border" >
+          <label class="flex-1">
+            <span class="text-sm text-gray-600">Change avatar</span>
+            <input name="avatar" type="file" accept="image/*"
+                   class="mt-1 w-full" >
+          </label>
+        </div>
+
+        <!-- display name -->
+        <label class="block">
+          <span class="text-sm text-gray-600">Display name</span>
+          <input name="displayName" value="${me.displayName||""}"
+                 class="mt-1 w-full p-2 border rounded" >
         </label>
-      </div>
 
-      <!-- display name -->
-      <label class="block">
-        <span class="text-sm text-gray-600">Display name</span>
-        <input name="displayName" value="${user.displayName||""}"
-               class="mt-1 w-full p-2 border rounded" >
-      </label>
+        <!-- password -->
+        <fieldset class="border-t pt-4 space-y-3">
+          <legend class="text-sm font-medium">Change password</legend>
+          <input name="oldPass"  type="password" placeholder="Current password"
+                 class="w-full p-2 border rounded" >
+          <input name="newPass"  type="password" placeholder="New password"
+                 class="w-full p-2 border rounded" >
+          <input name="newPass2" type="password" placeholder="Confirm new password"
+                 class="w-full p-2 border rounded" >
+        </fieldset>
+      </section>
 
-      <!-- password -->
-      <fieldset class="border-t pt-4 space-y-3">
-        <legend class="text-sm font-medium">Change password</legend>
-        <input name="oldPass"  type="password" placeholder="Current password"
-               class="w-full p-2 border rounded" >
-        <input name="newPass"  type="password" placeholder="New password"
-               class="w-full p-2 border rounded" >
-        <input name="newPass2" type="password" placeholder="Confirm new password"
-               class="w-full p-2 border rounded" >
-      </fieldset>
+      <!-- ░░░░░░  CHANNELS (admins only)  ░░░░░░ -->
+      ${me.role === "admin" ? adminChannelSection() : ""}
 
-      <!-- buttons -->
-      <div class="flex justify-between pt-4">
+      <!-- buttons & feedback -->
+      <p id="setMsg" class="text-sm text-center text-red-600 hidden"></p>
+
+      <div class="flex justify-between pt-2">
         <button type="button" id="setCancel"
                 class="px-4 py-2 rounded border">Cancel</button>
         <button class="px-4 py-2 bg-indigo-600 text-white rounded">
           Save
         </button>
       </div>
-
-      <p id="setMsg" class="text-sm text-center mt-2 hidden"></p>
     </form>`;
 
-  /* live avatar preview when a file is chosen */
+  /* live avatar preview */
   modal.querySelector('input[name="avatar"]').onchange = e=>{
     const f = e.target.files[0];
     if (f) modal.querySelector("#setAvatarPrev").src = URL.createObjectURL(f);
   };
 
-  /* wire-up buttons */
+  /* buttons */
   modal.querySelector("#setCancel").onclick = ()=>modal.remove();
   modal.querySelector("#setForm").onsubmit   = saveSettings;
 
   document.body.appendChild(modal);
+
+  /* ---------- helpers just for this dialog ---------- */
+  function adminChannelSection(){
+    /* mini row component */
+    const row = c => /*html*/`
+      <div class="flex items-center gap-2 py-1">
+        <!-- toggle staffOnly -->
+        <label class="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" ${c.staffOnly ? "checked" : ""}
+                 onchange="toggleStaffOnly('${c.id}', this.checked)"
+                 class="accent-indigo-600">
+          <span class="text-xs select-none">staff-only</span>
+        </label>
+
+        <!-- name (editable inline) -->
+        <input  type="text" value="${c.name}"
+                onchange="renameChanInline('${c.id}', this.value)"
+                class="flex-1 px-1 border rounded text-sm">
+
+        <!-- delete -->
+        <button onclick="deleteChanInline('${c.id}', '${c.name}')"
+                class="text-red-600 text-xs">🗑</button>
+      </div>`;
+
+    /* expose tiny helpers globally for simplicity */
+    window.toggleStaffOnly = async (id,val)=>{
+      await pb.collection("channels").update(id,{ staffOnly:val });
+      await refreshChannels(id);
+    };
+    window.renameChanInline = async (id,newName)=>{
+      if(!newName.trim()) return;
+      await pb.collection("channels").update(id,{ name:newName.trim() });
+      await refreshChannels(id);
+    };
+    window.deleteChanInline = async (id,name)=>{
+      if(!confirm(`Delete #${name}?`)) return;
+      await pb.collection("channels").delete(id);
+      await refreshChannels(state.channels[0]?.id);
+    };
+
+    /* build rows */
+    return /*html*/`
+      <section class="border-t pt-4">
+        <h3 class="text-sm font-medium mb-2">Channels</h3>
+        <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+          ${state.channels.map(row).join("")}
+        </div>
+        <button type="button" id="newChanBtn"
+                class="mt-2 text-indigo-600 text-sm">＋ New channel</button>
+      </section>`;
+  }
+
+  /* inline “new channel” button inside admin section */
+  modal.querySelector("#newChanBtn")?.addEventListener("click", async ()=>{
+    const name = prompt("Channel name (no spaces)");
+    if(!name) return;
+    const rec = await pb.collection("channels")
+                        .create({ name, createdBy:me.id, staffOnly:false });
+    await refreshChannels(rec.id);
+    /* redraw section */
+    modal.remove();
+    openSettings();   // reopen to show fresh list
+  });
 }
+
+
+
+     
+
 
 /* ───────── saveSettings ───────── */
 /* ───────── saveSettings (with detailed password messages) ───────── */
