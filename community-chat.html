@@ -190,12 +190,11 @@ function chatUI(){
   ${state.messages.filter(m => !m.pinned).map(renderMsg)}
 </section>
 
-
-
-
-
-
-      ${state.current ? msgComposer() : ""}
+      ${state.current && canPostToCurrent() ? msgComposer()
+     : state.current ? html`
+         <p class="p-4 text-center text-sm text-gray-500 border-t">
+           Read-only channel. Only staff can post here.
+         </p>` : ""}
     </main>
   </div>`; }
 
@@ -297,6 +296,11 @@ if (typeof user === "object") {
 }
 
 
+function canPostToCurrent(){
+  if(!state.current || !state.user) return false;
+  if(state.user.role === "admin" || state.user.role === "moderator") return true;
+  return !state.current.staffOnly;   // members need the flag to be OFF
+}
 
 
 
@@ -644,6 +648,12 @@ async function subscribeMessages(channelId){
   );
 }
 
+function channelRow(c){
+  const lock = c.staffOnly ? " 🔒" : "";
+  …
+  <span># ${c.name}${lock}</span>
+  …
+}
 
 
 function startPinRotation() {
