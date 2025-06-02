@@ -701,11 +701,6 @@ function openSettings () {
         <!-- display name -->
         <label class="block">
           <span class="text-sm text-gray-600">Display name</span>
-           <span class="text-sm">Order<span class="text-red-600">*</span></span>
-           <input name="order" type="number" min="0"
-         class="w-full p-2 border rounded"
-         required         <!-- ← HTML-level “required” -->
-  >
           <input name="displayName" value="${me.displayName||""}"
                  class="mt-1 w-full p-2 border rounded" >
         </label>
@@ -722,20 +717,43 @@ function openSettings () {
         </fieldset>
       </section>
 
-      <!-- ░░░░░░  CHANNELS (admins only)  ░░░░░░ -->
-      ${me.role === "admin" ? adminChannelSection() : ""}
+     /* ---------- mini row component (channel line) ---------- */
+const row = c => /*html*/`
+  <div class="flex items-center gap-2 py-1">
 
-      <!-- buttons & feedback -->
-      <p id="setMsg" class="text-sm text-center text-red-600 hidden"></p>
+    <!-- staff-only toggle -->
+    <label class="flex items-center gap-1 cursor-pointer">
+      <input  type="checkbox"
+              ${c.staffOnly ? "checked" : ""}
+              onchange="toggleStaffOnly('${c.id}', this.checked)"
+              class="accent-indigo-600">
+      <span class="text-xs select-none">staff-only</span>
+    </label>
 
-      <div class="flex justify-between pt-2">
-        <button type="button" id="setCancel"
-                class="px-4 py-2 rounded border">Cancel</button>
-        <button class="px-4 py-2 bg-indigo-600 text-white rounded">
-          Save
-        </button>
-      </div>
+    <!-- sort-order number (NEW) -->
+    <input  type="number" min="0" value="${c.sortorder ?? 0}"
+            onchange="setOrder('${c.id}', this.value)"
+            class="w-16 px-1 border rounded text-xs text-center">
+
+    <!-- editable channel name -->
+    <input  type="text" value="${c.name}"
+            onchange="renameChanInline('${c.id}', this.value)"
+            class="flex-1 px-1 border rounded text-sm">
+
+    <!-- delete button -->
+    <button onclick="deleteChanInline('${c.id}', '${c.name}')"
+            class="text-red-600 text-xs">🗑</button>
+  </div>`;
+
     </form>`;
+
+ window.setOrder = async (id, val) => {
+  const n = parseInt(val, 10);
+  if (Number.isNaN(n) || n < 0) { alert("Order must be 0 or higher"); return; }
+  await pb.collection("channels").update(id, { sortorder: n });
+  await refreshChannels(id);          // re-fetch & re-draw left sidebar
+};
+
 
   /* live avatar preview */
   modal.querySelector('input[name="avatar"]').onchange = e=>{
