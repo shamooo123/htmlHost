@@ -719,7 +719,7 @@ function openSettings () {
       </section>
 
       <!-- ░░░░░░  CHANNELS (admins only)  ░░░░░░ -->
-      ${me.role === "admin" ? "<!-- adminChannelSection() will be inserted here later -->" : ""}
+      ${me.role === "admin" ? adminChannelSection() : ""}
 
       <!-- feedback + buttons -->
       <p id="setMsg" class="text-sm text-center text-red-600 hidden"></p>
