@@ -10,7 +10,7 @@
   html,body{ height:100%; overflow:hidden; }
 }
 
-   @media (max-width:639px){ html,body{height:100%;margin:0;overflow:hidden;} #pb-chat{height:100%;} }
+css @media (max-width:639px){ /* phone */ html,body,#pb-chat{height:100%;margin:0;overflow:hidden;} #pb-chat{min-height:0;}
 </style>
 
 
@@ -208,10 +208,7 @@ function chatUI(){
 
       <!-- 1️⃣ leave this line exactly as is -->
 <!-- messages list -->
-<section id="msgwrap"
-         class="relative flex-1 p-4 pb-24 sm:pb-4
-                overflow-y-auto touch-pan-y space-y-3 bg-white">
-
+<section id="msgwrap" class="relative flex-1 min-h-0 p-4 pb-24 sm:pb-4 overflow-y-auto touch-pan-y space-y-3 bg-white">
 
   <!-- pinned-banner (only if something is pinned) -->
   ${state.pinned.length ? html`
