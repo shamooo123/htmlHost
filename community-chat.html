@@ -715,9 +715,24 @@ function openSettings () {
           <input name="newPass2" type="password" placeholder="Confirm new password"
                  class="w-full p-2 border rounded" >
         </fieldset>
+              …
       </section>
 
-    </form>`;          // ⬅︎ this back-tick closes modal.innerHTML
+      <!-- ░░░░░░  CHANNELS (admins only)  ░░░░░░ -->
+      ${me.role === "admin" ? "<!-- adminChannelSection() will be inserted here later -->" : ""}
+
+      <!-- feedback + buttons -->
+      <p id="setMsg" class="text-sm text-center text-red-600 hidden"></p>
+
+      <div class="flex justify-between pt-2">
+        <button type="button" id="setCancel"
+                class="px-4 py-2 rounded border">Cancel</button>
+        <button class="px-4 py-2 bg-indigo-600 text-white rounded">
+          Save
+        </button>
+      </div>
+    </form>`; 
+          // ⬅︎ this back-tick closes modal.innerHTML
     /* ────── ↓ ALL the code below is pure JavaScript, NOT inside the template literal ────── */
 
     /* ---------- mini row component (channel line) ---------- */
@@ -761,12 +776,6 @@ function openSettings () {
       if (f) modal.querySelector("#setAvatarPrev").src = URL.createObjectURL(f);
     };
 
-
-  /* live avatar preview */
-  modal.querySelector('input[name="avatar"]').onchange = e=>{
-    const f = e.target.files[0];
-    if (f) modal.querySelector("#setAvatarPrev").src = URL.createObjectURL(f);
-  };
 
   /* buttons */
   modal.querySelector("#setCancel").onclick = ()=>modal.remove();
