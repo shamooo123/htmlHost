@@ -1,5 +1,8 @@
 <!--  ==== COMMUNITY CHAT (PocketBase + Tailwind) ====  -->
-<div id="pb-chat" class="w-full sm:h-[80vh] h-full"></div>
+<!-- just change this one line -->
+<div id="pb-chat"
+     class="w-full"                               
+     style="height:calc(100vh - 122px)"></div>
 
 <!-- Tailwind ─ loads instantly from the official CDN -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -11,6 +14,20 @@
 }
 
 css @media (max-width:639px){ /* phone */ html,body,#pb-chat{height:100%;margin:0;overflow:hidden;} #pb-chat{min-height:0;}
+
+.sqs-block-html > .sqs-block-content{
+  height:100%;          /* let it grow */
+  padding:0 !important; /* remove the default 20 px */
+}
+                             
+@media (max-width:639px){  /* mobile */
+  #pb-chat{ height:calc(100vh - 56px); }   /* 56 px mobile header */
+}
+                             
+@media (min-width:640px){  /* desktop */
+  #pb-chat{ height:calc(100vh - 122px); }  /* 122 px desktop header */
+}
+
 </style>
 
 
