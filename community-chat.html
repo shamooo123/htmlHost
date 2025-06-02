@@ -14,12 +14,15 @@ import PocketBase from "https://cdn.jsdelivr.net/npm/pocketbase/+esm";
 import { html, render } from "https://cdn.jsdelivr.net/npm/lit-html/+esm";
 
  /* tiny helper --------------------------- */
-const isVideo = fileName => /\.(mp4|webm|ogg)$/i.test(fileName||"");
+const isVideo = f => /\.(mp4|webm|ogg|mov|mpeg|ogv|m4v|mkv)$/i.test(f||"");
 
 
 console.log("module executed");   // sanity check
 const PB_URL = "https://pocketbase-yxsc.onrender.com";          //  ← change me
-const pb     = new PocketBase(PB_URL);
+const pb = new PocketBase(PB_URL);
+
+/* ⬇︎  add this */
+pb.autoCancellation(false);
 
 /* ----------------------------------------------------
    STATE  /  SIMPLE STORE
@@ -236,9 +239,8 @@ const firstFile = Array.isArray(m.image) ? m.image[0] : m.image;
 
 let imageEl = "";
 if (firstFile){
-  const url = pb.files.getUrl?            // PB v0.18+
-               pb.files.getUrl(m, firstFile) :
-               pb.files.getURL(m, firstFile); // old helper
+ // 👈 drop-in replacement
+const url = pb.files.getUrl(m, firstFile);
 
   if (isVideo(firstFile)){
     imageEl = html`
