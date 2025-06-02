@@ -37,6 +37,7 @@ const state = {
   showSidebar : true        // ← add here, nowhere else
 };
 
+ if (window.innerWidth < 640) state.showSidebar = false;
 
 const setState = (obj)=>{ Object.assign(state,obj); draw(); };
 
@@ -123,7 +124,9 @@ async function signupEmail(e){
 /* ---------- CHAT SCREENS ---------- */
 function chatUI(){
   return html`
- <div class="flex h-[600px] border rounded overflow-hidden bg-gray-50">
+ <div class="flex flex-col sm:flex-row                    <!-- ⬅︎ column on mobile -->
+            h-screen sm:h-[600px]                        <!-- ⬅︎ full-height phone, fixed desktop -->
+            border rounded overflow-hidden bg-white">
 
   <!-- hamburger (absolute so it stays visible when sidebar is closed) -->
   <button @click=${toggleSidebar}
@@ -138,8 +141,14 @@ function chatUI(){
   </button>
 
   <!-- channels (width 56 when open, width 0 when closed) -->
-  <aside class="${state.showSidebar ? 'w-56' : 'w-0'} transition-all
-                 bg-gray-100 border-r overflow-y-auto">
+  <aside class="${state.showSidebar ? 'w-56' : 'w-0'}             /* desktop */
+                     sm:relative sm:translate-x-0               /* desktop */
+                     fixed top-0 left-0 h-full z-30             /* mobile drawer */
+                     transition-transform duration-200
+                     ${state.showSidebar ? 'translate-x-0' : '-translate-x-full'}
+                     bg-gray-100 border-r overflow-y-auto">
+       
+
     ${state.showSidebar ? html`
       <header class="p-3 pl-12 font-semibold flex justify-between items-center">
         Channels
@@ -235,32 +244,35 @@ if (typeof user === "object" && user.avatar) {
 }
 
   /* attached image (optional) */
+/* attached image OR video (optional) */
 const firstFile = Array.isArray(m.image) ? m.image[0] : m.image;
 
 let imageEl = "";
-if (firstFile){
- // 👈 drop-in replacement
-const url = pb.files.getUrl(m, firstFile);
+if (firstFile) {
+  // build the public URL (works on every PB version)
+  const url = pb.files.getUrl
+            ? pb.files.getUrl(m, firstFile)     // PB ≥ 0.23
+            : pb.files.getURL(m, firstFile);    // PB ≤ 0.22
 
-  if (isVideo(firstFile)){
+  if (isVideo(firstFile)) {
+    // video preview (plays in place, can go full-screen, plus download link)
     imageEl = html`
       <div class="mt-2 max-w-xs max-h-60">
         <video  src=${url}
                 controls
-                class="w-full h-full object-contain rounded
-                       bg-black"></video>
+                class="w-full h-full object-contain rounded bg-black">
+        </video>
 
-        <!-- extra download btn -->
-        <a  href=${url}
-            download
-            class="text-xs text-indigo-600 underline block mt-1">
+        <a href=${url} download
+           class="text-xs text-indigo-600 underline block mt-1">
           ⬇︎ Download
         </a>
       </div>`;
-  }else{
+  } else {
+    // plain image
     imageEl = html`
-      <img class="max-w-xs rounded mt-2"
-           src=${url} >`;
+      <img src=${url}
+           class="max-w-xs rounded mt-2">`;
   }
 }
 
@@ -336,8 +348,8 @@ function canPostToCurrent(){
 /* ---------- composer with live preview (pretty paper-clip) ---------- */
 function msgComposer() {
   return html`
-    <form @submit=${sendMsg}
-          class="flex flex-col gap-2 border-t p-3 bg-gray-50">
+    <form … class="flex flex-col gap-2 border-t p-3 bg-gray-50
+                    sm:static fixed inset-x-0 bottom-0 z-20">
 
       <!-- preview (hidden until a file is chosen) -->
       <div id="imgPreview" class="hidden flex items-center gap-2">
