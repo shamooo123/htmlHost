@@ -717,42 +717,49 @@ function openSettings () {
         </fieldset>
       </section>
 
-     /* ---------- mini row component (channel line) ---------- */
-const row = c => /*html*/`
-  <div class="flex items-center gap-2 py-1">
+    </form>`;          // ⬅︎ this back-tick closes modal.innerHTML
+    /* ────── ↓ ALL the code below is pure JavaScript, NOT inside the template literal ────── */
 
-    <!-- staff-only toggle -->
-    <label class="flex items-center gap-1 cursor-pointer">
-      <input  type="checkbox"
-              ${c.staffOnly ? "checked" : ""}
-              onchange="toggleStaffOnly('${c.id}', this.checked)"
-              class="accent-indigo-600">
-      <span class="text-xs select-none">staff-only</span>
-    </label>
+    /* ---------- mini row component (channel line) ---------- */
+    const row = c => /*html*/`
+      <div class="flex items-center gap-2 py-1">
+        <!-- staff-only toggle -->
+        <label class="flex items-center gap-1 cursor-pointer">
+          <input  type="checkbox"
+                  ${c.staffOnly ? "checked" : ""}
+                  onchange="toggleStaffOnly('${c.id}', this.checked)"
+                  class="accent-indigo-600">
+          <span class="text-xs select-none">staff-only</span>
+        </label>
 
-    <!-- sort-order number (NEW) -->
-    <input  type="number" min="0" value="${c.sortorder ?? 0}"
-            onchange="setOrder('${c.id}', this.value)"
-            class="w-16 px-1 border rounded text-xs text-center">
+        <!-- sort-order number -->
+        <input  type="number" min="0" value="${c.sortorder ?? 0}"
+                onchange="setOrder('${c.id}', this.value)"
+                class="w-16 px-1 border rounded text-xs text-center">
 
-    <!-- editable channel name -->
-    <input  type="text" value="${c.name}"
-            onchange="renameChanInline('${c.id}', this.value)"
-            class="flex-1 px-1 border rounded text-sm">
+        <!-- editable channel name -->
+        <input  type="text" value="${c.name}"
+                onchange="renameChanInline('${c.id}', this.value)"
+                class="flex-1 px-1 border rounded text-sm">
 
-    <!-- delete button -->
-    <button onclick="deleteChanInline('${c.id}', '${c.name}')"
-            class="text-red-600 text-xs">🗑</button>
-  </div>`;
+        <!-- delete button -->
+        <button onclick="deleteChanInline('${c.id}', '${c.name}')"
+                class="text-red-600 text-xs">🗑</button>
+      </div>`;
 
-    </form>`;
+    /* expose helper: change sortorder */
+    window.setOrder = async (id, val) => {
+      const n = parseInt(val, 10);
+      if (Number.isNaN(n) || n < 0) { alert("Order must be 0 or higher"); return; }
+      await pb.collection("channels").update(id, { sortorder: n });
+      await refreshChannels(id);            // re-fetch & redraw sidebar
+    };
 
- window.setOrder = async (id, val) => {
-  const n = parseInt(val, 10);
-  if (Number.isNaN(n) || n < 0) { alert("Order must be 0 or higher"); return; }
-  await pb.collection("channels").update(id, { sortorder: n });
-  await refreshChannels(id);          // re-fetch & re-draw left sidebar
-};
+    /* live avatar preview ----------------------------------------------------- */
+    modal.querySelector('input[name="avatar"]').onchange = e=>{
+      const f = e.target.files[0];
+      if (f) modal.querySelector("#setAvatarPrev").src = URL.createObjectURL(f);
+    };
 
 
   /* live avatar preview */
