@@ -130,15 +130,24 @@ function chatUI(){
 
   <!-- hamburger (absolute so it stays visible when sidebar is closed) -->
   <button @click=${toggleSidebar}
-          class="absolute z-20 m-2 btn-surface p-2">
-    <!-- three-line icon given by you -->
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none"
-         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-         class="w-5 h-5">
-      <path stroke-linecap="round" stroke-linejoin="round"
-            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
-    </svg>
-  </button>
+        class="fixed z-50 m-2 sm:absolute btn-surface p-2">
+  ${state.showSidebar
+    ? html`<!-- X / close -->
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none"
+           viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+           class="w-5 h-5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M6 18L18 6M6 6l12 12" />
+      </svg>`
+    : html`<!-- hamburger -->
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none"
+           viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+           class="w-5 h-5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+      </svg>`}
+</button>
+
 
   <!-- channels (width 56 when open, width 0 when closed) -->
   <aside class="${state.showSidebar ? 'w-56' : 'w-0'}             /* desktop */
