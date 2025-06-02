@@ -134,7 +134,7 @@ function chatUI(){
   <aside class="${state.showSidebar ? 'w-56' : 'w-0'} transition-all
                  bg-gray-100 border-r overflow-y-auto">
     ${state.showSidebar ? html`
-      <header class="p-3 font-semibold flex justify-between items-center">
+      <header class="p-3 pl-8 font-semibold flex justify-between items-center">
         Channels
         ${isMod()? html`<button @click=${createChannel}>+</button>` : ""}
       </header>
