@@ -701,6 +701,11 @@ function openSettings () {
         <!-- display name -->
         <label class="block">
           <span class="text-sm text-gray-600">Display name</span>
+           <span class="text-sm">Order<span class="text-red-600">*</span></span>
+           <input name="order" type="number" min="0"
+         class="w-full p-2 border rounded"
+         required         <!-- ← HTML-level “required” -->
+  >
           <input name="displayName" value="${me.displayName||""}"
                  class="mt-1 w-full p-2 border rounded" >
         </label>
