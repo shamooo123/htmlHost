@@ -134,7 +134,7 @@ function chatUI(){
   <aside class="${state.showSidebar ? 'w-56' : 'w-0'} transition-all
                  bg-gray-100 border-r overflow-y-auto">
     ${state.showSidebar ? html`
-      <header class="p-3 pl-8 font-semibold flex justify-between items-center">
+      <header class="p-3 pl-12 font-semibold flex justify-between items-center">
         Channels
         ${isMod()? html`<button @click=${createChannel}>+</button>` : ""}
       </header>
@@ -147,7 +147,7 @@ function chatUI(){
       <header class="p-3 border-b bg-white font-semibold flex justify-between">
 
    <!-- left : channel title -->
-   <span>
+   <span class=${state.showSidebar ? "" : "ml-12"} >
      ${state.current ? `#${state.current.name}` : "select a channel"}
    </span>
 
