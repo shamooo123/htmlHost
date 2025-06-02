@@ -155,13 +155,17 @@ function chatUI(){
    <span class="flex items-center gap-4">
      <!-- Settings -->
 <button @click=${openSettings}
-        class="btn-surface mr-2 px-3 py-1.5 text-sm text-indigo-600">
+         class="mr-2 px-3 py-1.5 text-sm text-indigo-600
+                rounded transition
+                hover:bg-indigo-50 active:bg-indigo-100">
   ⚙︎ Settings
 </button>
 
 <!-- Log-out -->
 <button @click=${logout}
-        class="btn-surface px-3 py-1.5 text-sm text-red-600">
+         class="px-3 py-1.5 text-sm text-red-600
+                rounded transition
+                hover:bg-indigo-50 active:bg-indigo-100">
   Log&nbsp;out
 </button>
 
