@@ -13,6 +13,10 @@
 import PocketBase from "https://cdn.jsdelivr.net/npm/pocketbase/+esm";
 import { html, render } from "https://cdn.jsdelivr.net/npm/lit-html/+esm";
 
+ /* tiny helper --------------------------- */
+const isVideo = fileName => /\.(mp4|webm|ogg)$/i.test(fileName||"");
+
+
 console.log("module executed");   // sanity check
 const PB_URL = "https://pocketbase-yxsc.onrender.com";          //  ← change me
 const pb     = new PocketBase(PB_URL);
@@ -228,12 +232,35 @@ if (typeof user === "object" && user.avatar) {
 }
 
   /* attached image (optional) */
- const firstFile = Array.isArray(m.image) ? m.image[0] : m.image;
- const imageEl   = firstFile
-     ? html`<img class="max-w-xs rounded mt-2"
-                 src=${pb.files.getURL(m, firstFile, { thumb:"640x640" })}>`
-     : "";
+const firstFile = Array.isArray(m.image) ? m.image[0] : m.image;
 
+let imageEl = "";
+if (firstFile){
+  const url = pb.files.getUrl?            // PB v0.18+
+               pb.files.getUrl(m, firstFile) :
+               pb.files.getURL(m, firstFile); // old helper
+
+  if (isVideo(firstFile)){
+    imageEl = html`
+      <div class="mt-2 max-w-xs max-h-60">
+        <video  src=${url}
+                controls
+                class="w-full h-full object-contain rounded
+                       bg-black"></video>
+
+        <!-- extra download btn -->
+        <a  href=${url}
+            download
+            class="text-xs text-indigo-600 underline block mt-1">
+          ⬇︎ Download
+        </a>
+      </div>`;
+  }else{
+    imageEl = html`
+      <img class="max-w-xs rounded mt-2"
+           src=${url} >`;
+  }
+}
 
   /* ---------- role badge ---------- */
 let roleBadge = "";
@@ -323,8 +350,9 @@ function msgComposer() {
                 class="flex-1 p-2 border rounded">
 
         <!-- hidden file input -->
-        <input  id="imgInput" name="image" type="file" accept="image/*"
-                class="hidden" @change=${showPreview} >
+        <input  id="imgInput" name="image" type="file"
+        accept="image/*,video/*"
+        class="hidden" @change=${showPreview} >
 
         <!-- prettier paper-clip -->
         <button type="button"
@@ -414,11 +442,31 @@ function showPreview(e){
   const file = e.target.files[0];
   if (!file) return clearImage();
 
-  const url   = URL.createObjectURL(file);
-  imgThumb.src      = url;
+  const url = URL.createObjectURL(file);
+
+  if (file.type.startsWith("video/")){
+    imgThumb.replaceWith(
+      Object.assign(document.createElement("video"),{
+        id   : "imgThumb",
+        src  : url,
+        muted: true,
+        loop : true,
+        playsInline: true,
+        className  : "w-16 h-16 object-cover rounded"
+      }));
+  }else{
+    imgThumb.replaceWith(
+      Object.assign(document.createElement("img"),{
+        id   : "imgThumb",
+        src  : url,
+        className: "w-16 h-16 object-cover rounded"
+      }));
+  }
+
   imgName.textContent = file.name;
   imgPreview.classList.remove("hidden");
 }
+
 
 /* ---- helper: clear the chosen file ---- */
 function clearImage(){
