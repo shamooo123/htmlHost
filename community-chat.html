@@ -373,6 +373,7 @@ function switchChannel(c){
    but the ✎ / 🗑 icons stop the click bubbling */
 function channelRow(c){
   const isCurrent = c.id === state.current?.id;
+ const lock      = c.staffOnly ? " 🔒" : "";
 
   return html`
     <div
@@ -380,7 +381,7 @@ function channelRow(c){
              cursor-pointer ${isCurrent ? 'bg-white font-semibold' : ''}"
       @click=${() => switchChannel(c)}
     >
-      <span># ${c.name}</span>
+      <span># ${c.name}${lock}</span>
 
       ${isMod() ? html`
         <span class="opacity-0 group-hover:opacity-100 space-x-1 text-xs">
@@ -648,12 +649,6 @@ async function subscribeMessages(channelId){
   );
 }
 
-function channelRow(c){
-  const lock = c.staffOnly ? " 🔒" : "";
-  …
-  <span># ${c.name}${lock}</span>
-  …
-}
 
 
 function startPinRotation() {
