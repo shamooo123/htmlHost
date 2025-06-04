@@ -743,13 +743,15 @@ async function loadMessages(channelId){
   );
 
   /* 3️⃣  normalise: ensure m.image is a *single* filename string */
-  list.forEach(m => {
-    if (Array.isArray(m.image)) m.image = m.image[0] || "";
-  });
-     if(m.replyTo && typeof m.replyTo === "string"){
-   // PB didn’t expand (older record). Fetch on the fly:
-   m.replyTo = await pb.collection("messages")
-                       .getOne(m.replyTo,{expand:"author"});
+  for (const m of list) {
+  /* 3a. turn 1-item array → plain string */
+  if (Array.isArray(m.image)) m.image = m.image[0] || "";
+
+  /* 3b. if replyTo is only an ID, fetch its record + author */
+  if (m.replyTo && typeof m.replyTo === "string") {
+    m.replyTo = await pb.collection("messages")
+                        .getOne(m.replyTo, { expand:"author" });
+  }
 }
 
 
