@@ -448,17 +448,20 @@ function msgComposer () {
 
       <!-- 🆕 reply-preview (hidden until state.replying is set) -->
       ${state.replying ? html`
-        <div class="flex items-center gap-2 bg-indigo-50 px-2 py-1 rounded">
-          <span class="text-xs font-semibold text-indigo-600">
-            Reply&nbsp;to&nbsp;${state.replying.authorName}
-          </span>
-          <span class="flex-1 text-xs truncate">
-            ${truncate(state.replying.text || "[attachment]", 50)}
-          </span>
-          <button type="button"
-                  @click=${() => setState({ replying:null })}
-                  class="text-indigo-600 text-xs">✕</button>
-        </div>` : ""}
+  <div class="flex items-center gap-2 bg-indigo-50 px-2 py-1 rounded
+              cursor-pointer"
+       @click=${() => scrollToMsg(state.replying.id)}>
+    <span class="text-xs font-semibold text-indigo-600">
+      Reply&nbsp;to&nbsp;${state.replying.authorName}
+    </span>
+    <span class="flex-1 text-xs truncate">
+      ${truncate(state.replying.text || "[attachment]", 50)}
+    </span>
+    <button type="button"
+            @click=${() => setState({replying:null})}
+            class="text-indigo-600 text-xs">✕</button>
+  </div>` : ""}
+
 
       <!-- file preview (image / video) -->
       <div id="imgPreview" class="hidden flex items-center gap-2">
@@ -723,10 +726,11 @@ async function loadMessages(channelId){
 
   /* 1️⃣  grab everything that already exists */
   let list = await pb.collection("messages").getFullList({
-    filter : `channel='${channelId}'`,
-    expand : "author",
-    sort   : "-pinned,created"
-  });
+  filter : `channel='${channelId}'`,
+  expand : "author,replyTo,replyTo.author",   // ← add these
+  sort   : "-pinned,created"
+});
+
 
   /* 2️⃣  legacy fix: replace “image” placeholders with the real filename */
   await Promise.all(
@@ -800,7 +804,8 @@ async function subscribeMessages(channelId){
         let rec = ev.record;
         if (!rec.image || rec.image === "image") {
           rec = await pb.collection("messages")
-                        .getOne(rec.id, { expand:"author" });
+              .getOne(rec.id, { expand: "author,replyTo,replyTo.author" });
+
         }
         if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
         upsert(rec);
@@ -810,7 +815,8 @@ async function subscribeMessages(channelId){
         let rec = ev.record;
         if (!rec.image || rec.image === "image") {
           rec = await pb.collection("messages")
-                        .getOne(rec.id, { expand:"author" });
+              .getOne(rec.id, { expand: "author,replyTo,replyTo.author" });
+
         }
         if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
         upsert(rec);
@@ -837,7 +843,12 @@ async function subscribeMessages(channelId){
     },
 
     /* subscribe options */
-    { filter:`channel='${channelId}'`, expand:"author" }
+   {
+      filter : `channel='${channelId}'`,
+      // old:  expand : "author"
+      // new:  expand *both* the reply and its author
+      expand : "author,replyTo,replyTo.author"
+    }
   );
 }
 
