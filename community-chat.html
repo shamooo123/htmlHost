@@ -13,7 +13,10 @@
   html,body{ height:100%; overflow:hidden; }
 }
 
-css @media (max-width:639px){ /* phone */ html,body,#pb-chat{height:100%;margin:0;overflow:hidden;} #pb-chat{min-height:0;}
+@media (max-width:639px){      /* phone */
+  html,body,#pb-chat{height:100%;margin:0;overflow:hidden;}
+  #pb-chat{min-height:0;}
+}
 
 .sqs-block-html > .sqs-block-content{
   height:100%;          /* let it grow */
@@ -361,8 +364,23 @@ if (typeof user === "object") {
 }
 
 
+  /* ---------- 🆕 build replyPreview (if any) ---------- */
+  let replyPreview = "";
+  if (m.expand?.replyTo) {
+    const r        = m.expand.replyTo;
+    const rName    = r.expand?.author?.displayName || "Unknown";
+    replyPreview = html`
+      <a @click=${e=>scrollToMsg(r.id,e)}
+         class="block border-l-2 border-indigo-400 pl-2 mb-1
+                text-xs cursor-pointer hover:bg-indigo-50">
+        <span class="font-semibold">${rName}</span>:
+        ${truncate(r.text || "[attachment]",60)}
+      </a>`;
+  }
+
   /* ---------- template ---------- */
   return html`
+
   <article class="flex gap-3" id="m-${m.id}">
     ${avatarEl}
 
@@ -397,19 +415,7 @@ if (typeof user === "object") {
 
       </header>
 
-/* ---------- 🆕 if this message is itself a reply ---------- */ 
-let replyPreview = "";
-if (m.expand?.replyTo){
-  const r = m.expand.replyTo;
-  const rName = r.expand?.author?.displayName || "Unknown";
-  replyPreview = html`
-    <a @click=${e=>scrollToMsg(r.id, e)}
-       class="block border-l-2 border-indigo-400 pl-2 mb-1
-              text-xs cursor-pointer hover:bg-indigo-50">
-      <span class="font-semibold">${rName}</span>:
-      ${truncate(r.text || "[attachment]",60)}
-    </a>`;
-}
+${replyPreview}
 
 
       ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
@@ -653,8 +659,8 @@ function showPinnedModal() {
 /* ---------- send message with error handling ---------- */
 async function sendMsg(e){
   e.preventDefault();
-  if(state.replying) fd.set("replyTo", state.replying.id);
-  const fd = new FormData(e.target);
+  const fd = new FormData(e.target);          // create first
+  if (state.replying) fd.set("replyTo", state.replying.id);
   fd.set("channel", state.current.id);
   fd.set("author",  state.user.id);
 
