@@ -28,6 +28,12 @@ css @media (max-width:639px){ /* phone */ html,body,#pb-chat{height:100%;margin:
   #pb-chat{ height:calc(100vh - 122px); }  /* 122 px desktop header */
 }
 
+/* reply highlight when user taps a preview */
+@keyframes flash {from{background:#fef3c7;} to{background:transparent;}}
+
+article.flash{ animation:flash 1.2s; }
+
+                             
 </style>
 
 
@@ -47,6 +53,34 @@ const isVideo = f => /\.(mp4|webm|ogg|mov|mpeg|ogv|m4v|mkv)$/i.test(f||"");
 console.log("module executed");   // sanity check
 const PB_URL = "https://pocketbase-yxsc.onrender.com";          //  ← change me
 const pb = new PocketBase(PB_URL);
+
+/* 🆕 helper ---------------------------------------------------- */
+const byId   = id => document.getElementById(id);
+const msgDom = id => byId(`m-${id}`);           // <article id="m-⧸ID">
+
+     /* ------------- reply helpers ----------------------------- */
+function setReply(m){
+  setState({
+    replying:{
+      id        : m.id,
+      text      : m.text,
+      authorName: m.expand?.author?.displayName || "Unknown"
+    }
+  });
+  // focus the text box quickly
+  setTimeout(()=> byId("composerText")?.focus(),100);
+}
+
+function scrollToMsg(id,e){
+  e?.preventDefault();
+  const el = msgDom(id);
+  if(!el) return;
+  el.scrollIntoView({behavior:"smooth",block:"center"});
+  el.animate([{background:"#fef3c7"},{background:"transparent"}],
+             {duration:1200});
+}
+
+
 
 /* ⬇︎  add this */
 pb.autoCancellation(false);
@@ -357,11 +391,31 @@ if (typeof user === "object") {
         ${isMod()
           ? html`<button @click=${()=>pinMsg(m)}
                    class="ml-2 text-xs">${m.pinned ? "Unpin📌" : "Pin📌"}</button>` : ""}
+          ${ state.current ? html`
+  <button @click=${()=>setReply(m)}
+          class="ml-2 text-xs text-indigo-600">Reply↩︎</button>` : "" }
+
       </header>
+
+/* ---------- 🆕 if this message is itself a reply ---------- */ 
+let replyPreview = "";
+if (m.expand?.replyTo){
+  const r = m.expand.replyTo;
+  const rName = r.expand?.author?.displayName || "Unknown";
+  replyPreview = html`
+    <a @click=${e=>scrollToMsg(r.id, e)}
+       class="block border-l-2 border-indigo-400 pl-2 mb-1
+              text-xs cursor-pointer hover:bg-indigo-50">
+      <span class="font-semibold">${rName}</span>:
+      ${truncate(r.text || "[attachment]",60)}
+    </a>`;
+}
+
 
       ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
       ${imageEl}
     </div>
+    
   </article>`;
 }
 
@@ -379,14 +433,28 @@ function canPostToCurrent(){
 
 
 
-/* ---------- composer with live preview (pretty paper-clip) ---------- */
-function msgComposer() {
+/* ---------- composer with reply-preview + file-preview ---------- */
+function msgComposer () {
   return html`
     <form @submit=${sendMsg}
-         class="flex flex-col gap-2 border-t p-3 bg-gray-50
-                    sm:static fixed inset-x-0 bottom-0 z-20">
+          class="flex flex-col gap-2 border-t p-3 bg-gray-50
+                 sm:static fixed inset-x-0 bottom-0 z-20">
 
-      <!-- preview (hidden until a file is chosen) -->
+      <!-- 🆕 reply-preview (hidden until state.replying is set) -->
+      ${state.replying ? html`
+        <div class="flex items-center gap-2 bg-indigo-50 px-2 py-1 rounded">
+          <span class="text-xs font-semibold text-indigo-600">
+            Reply&nbsp;to&nbsp;${state.replying.authorName}
+          </span>
+          <span class="flex-1 text-xs truncate">
+            ${truncate(state.replying.text || "[attachment]", 50)}
+          </span>
+          <button type="button"
+                  @click=${() => setState({ replying:null })}
+                  class="text-indigo-600 text-xs">✕</button>
+        </div>` : ""}
+
+      <!-- file preview (image / video) -->
       <div id="imgPreview" class="hidden flex items-center gap-2">
         <img   id="imgThumb" class="w-16 h-16 rounded object-cover">
         <span  id="imgName"  class="text-sm text-gray-700"></span>
@@ -395,25 +463,34 @@ function msgComposer() {
       </div>
 
       <div class="flex gap-3">
-        <input  name="text" placeholder="Message…" autocomplete="off"
+        <!-- give the textbox an id for quick focus after choosing “Reply” -->
+        <input  id="composerText"
+                name="text"
+                placeholder="Message…"
+                autocomplete="off"
                 class="flex-1 p-2 border rounded">
 
         <!-- hidden file input -->
-        <input  id="imgInput" name="image" type="file"
-        accept="image/*,video/*"
-        class="hidden" @change=${showPreview} >
+        <input  id="imgInput"
+                name="image"
+                type="file"
+                accept="image/*,video/*"
+                class="hidden"
+                @change=${showPreview} >
 
-        <!-- prettier paper-clip -->
+        <!-- nicer paper-clip -->
         <button type="button"
                 @click=${() => document.getElementById("imgInput").click()}
                 class="w-10 h-10 flex items-center justify-center
                        rounded hover:bg-indigo-50 active:bg-indigo-100
                        transition">
           <!-- hero-icons outline paper-clip (24×24) -->
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-  <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-</svg>
-
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none"
+               viewBox="0 0 24 24" stroke-width="1.5"
+               stroke="currentColor" class="size-6">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+          </svg>
         </button>
 
         <button class="px-4 py-2 bg-indigo-600 text-white rounded
@@ -423,6 +500,7 @@ function msgComposer() {
       </div>
     </form>`;
 }
+
 
 
 /* ---------- ACTIONS ---------- */
@@ -575,7 +653,7 @@ function showPinnedModal() {
 /* ---------- send message with error handling ---------- */
 async function sendMsg(e){
   e.preventDefault();
-
+  if(state.replying) fd.set("replyTo", state.replying.id);
   const fd = new FormData(e.target);
   fd.set("channel", state.current.id);
   fd.set("author",  state.user.id);
@@ -590,6 +668,7 @@ async function sendMsg(e){
 
       /*  clear form + preview immediately  */
       e.target.reset();
+      setState({replying:null});
       clearImage();
 
   } catch (err){
@@ -661,6 +740,12 @@ async function loadMessages(channelId){
   list.forEach(m => {
     if (Array.isArray(m.image)) m.image = m.image[0] || "";
   });
+     if(m.replyTo && typeof m.replyTo === "string"){
+   // PB didn’t expand (older record). Fetch on the fly:
+   m.replyTo = await pb.collection("messages")
+                       .getOne(m.replyTo,{expand:"author"});
+}
+
 
   /* 4️⃣  compute the pinned list and push everything into state */
   const pinned = list
