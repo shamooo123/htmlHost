@@ -41,6 +41,21 @@ article.flash{ animation:flash 1.2s; }
                              
 </style>
 
+<style>
+/* ░░ 1-A  — let the Squarespace section give the iframe real estate ░░ */
+.sqs-block-html                {padding:0 !important;}
+.sqs-block-html > .sqs-block-content{height:100% !important;}
+
+/* ░░ 1-B  — chat host is always exactly the viewport minus header ░░ */
+#pb-chat{
+  height:calc(100vh - 122px);      /* desktop header */
+  width:100%;
+}
+@media (max-width:639px){          /* mobile */
+  #pb-chat{height:calc(100vh - 56px);}
+}
+</style>
+
 <!--  ==== COMMUNITY CHAT (PocketBase + Tailwind) ====  -->
 
 <!-- ▼ THIS LINE WAS MISSING -->
@@ -340,9 +355,18 @@ if (firstFile) {
     imageEl = html`
       <div class="mt-2 max-w-xs max-h-60">
         <video  src=${url}
-                controls
-                class="w-full h-full object-contain rounded bg-black">
+        controls playsinline webkit-playsinline
+        class="w-full h-full object-contain rounded bg-black"></video>
         </video>
+
+/* 3-B: tiny thumbnail shown before sending */
+Object.assign(document.createElement("video"),{
+  id   : "imgThumb",
+  src  : url,
+  muted: true, loop:true,
+  playsInline:true, webkitPlaysInline:true,   // new
+  className:"w-16 h-16 object-cover rounded"
+})
 
         <a href=${url} download
            class="text-xs text-indigo-600 underline block mt-1">
@@ -894,7 +918,8 @@ function openSettings () {
   /* build the modal ---------------------------------------------- */
   modal.innerHTML = /*html*/`
     <form id="setForm"
-          class="bg-white rounded-xl w-[90vw] max-w-lg p-6 space-y-6">
+       class="bg-white rounded-xl w-[90vw] max-w-lg p-6 space-y-6
+              max-h-[90vh] overflow-y-auto">
 
       <h2 class="text-lg font-semibold text-center">Account settings</h2>
 
