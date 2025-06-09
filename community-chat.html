@@ -126,7 +126,7 @@ const state = {
   showSidebar : true        // ← add here, nowhere else
 };
 
- if (window.innerWidth < 640) state.showSidebar = false;
+
 
 const setState = (obj)=>{ Object.assign(state,obj); draw(); };
 
@@ -210,17 +210,16 @@ async function signupEmail(e){
 }
 
 
-/* ---------- CHAT SCREENS (channels on top) ---------- */
+/* ---------- CHAT SCREENS (channels on top, fully responsive) ---------- */
 function chatUI () {
   return html`
-  <!-- wrapper fills the #pb-chat div -->
+  <!-- wrapper fills the #pb-chat DIV -->
   <div class="flex flex-col w-full h-full bg-white border rounded overflow-hidden">
 
-    <!-- ░░  horizontal channel bar  ░░ -->
-    <nav class="flex items-center gap-2 px-3 py-2 bg-gray-100 border-b overflow-x-auto">
-
+    <!-- ░░ CHANNEL BAR ░░ -->
+    <nav class="shrink-0 flex items-center gap-2 px-3 py-2
+                bg-gray-100 border-b overflow-x-auto">
       ${state.channels.map(channelRow)}
-
       ${isMod() ? html`
         <button @click=${createChannel}
                 class="px-3 py-1 rounded-full shrink-0
@@ -230,14 +229,12 @@ function chatUI () {
         </button>` : ""}
     </nav>
 
-    <!-- ░░  header + messages + composer  ░░ -->
+    <!-- ░░ MAIN AREA ░░ -->
     <main class="flex-1 flex flex-col">
 
-      <!-- chat-header -->
-      <header class="p-3 border-b bg-white font-semibold flex justify-between">
-        <span>
-          ${state.current ? `#${state.current.name}` : "select a channel"}
-        </span>
+      <!-- header -->
+      <header class="shrink-0 p-3 border-b bg-white font-semibold flex justify-between">
+        <span>${state.current ? `#${state.current.name}` : "select a channel"}</span>
 
         <span class="flex items-center gap-4">
           <button @click=${openSettings}
@@ -253,10 +250,10 @@ function chatUI () {
         </span>
       </header>
 
-      <!-- messages list -->
+      <!-- messages -->
       <section id="msgwrap"
-               class="relative flex-1 min-h-0 p-4 pb-24 sm:pb-4
-                      overflow-y-auto touch-pan-y space-y-3 bg-white">
+               class="flex-1 min-h-0 p-4 pb-4 overflow-y-auto touch-pan-y
+                      space-y-3 bg-white">
 
         ${state.pinned.length ? html`
           <div class="sticky top-0 z-10 border border-indigo-300 bg-indigo-50
@@ -272,14 +269,15 @@ function chatUI () {
 
       <!-- composer or read-only notice -->
       ${state.current && canPostToCurrent()
-        ? msgComposer()
+        ? html`<div class="shrink-0 border-t">${msgComposer()}</div>`
         : state.current ? html`
-            <p class="p-4 text-center text-sm text-gray-500 border-t">
+            <p class="shrink-0 p-4 text-center text-sm text-gray-500 border-t">
               Read-only channel. Only staff can post here.
             </p>` : ""}
     </main>
   </div>`;
 }
+
 
 
 function renderMsg(m){
@@ -423,9 +421,8 @@ ${replyPreview}
 }
 
    
-   function toggleSidebar(){
-  setState({ showSidebar: !state.showSidebar });
-}
+
+  
 
 
 function canPostToCurrent(){
