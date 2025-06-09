@@ -252,8 +252,11 @@ function chatUI () {
 
       <!-- messages -->
      <section id="msgwrap"
-         class="relative flex-1 min-h-0 p-4 sm:pb-4
-                overflow-y-auto touch-pan-y space-y-3 bg-white">
+         class="relative flex-1 min-h-0
+                p-4 sm:pb-4
+                overflow-y-auto touch-pan-y
+                space-y-3 bg-white">
+
 
 
 
@@ -437,10 +440,10 @@ function canPostToCurrent(){
 
 /* ---------- composer with reply-preview + file-preview ---------- */
 function msgComposer () {
-  return html`
+   return html`
     <form @submit=${sendMsg}
           class="flex flex-col gap-2 border-t p-3 bg-gray-50
-                fixed sm:static inset-x-0 bottom-0 z-20"
+                 fixed sm:static inset-x-0 bottom-0 z-20">
 
       <!-- 🆕 reply-preview (hidden until state.replying is set) -->
       ${state.replying ? html`
