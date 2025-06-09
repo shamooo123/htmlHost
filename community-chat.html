@@ -252,8 +252,10 @@ function chatUI () {
 
       <!-- messages -->
       <section id="msgwrap"
-               class="flex-1 min-h-0 p-4 pb-4 overflow-y-auto touch-pan-y
-                      space-y-3 bg-white">
+         class="relative flex-1 min-h-0  <!-- ← keep min-h-0 -->
+                p-4 pb-24 sm:pb-4
+                overflow-y-auto touch-pan-y space-y-3 bg-white">
+
 
         ${state.pinned.length ? html`
           <div class="sticky top-0 z-10 border border-indigo-300 bg-indigo-50
@@ -269,7 +271,7 @@ function chatUI () {
 
       <!-- composer or read-only notice -->
       ${state.current && canPostToCurrent()
-        ? html`<div class="shrink-0 border-t">${msgComposer()}</div>`
+  ? html`<div class="shrink-0 border-t">${msgComposer()}</div>`
         : state.current ? html`
             <p class="shrink-0 p-4 text-center text-sm text-gray-500 border-t">
               Read-only channel. Only staff can post here.
