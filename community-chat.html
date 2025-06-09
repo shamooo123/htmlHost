@@ -1187,8 +1187,15 @@ try{
 
 
 /* ---------- INIT ---------- */
-if(state.user) loadChannels();
-draw();
+/* ---- wait until #pb-chat is really in the page ---- */
+function boot(){
+  const host = document.getElementById('pb-chat');
+  if(!host) return requestAnimationFrame(boot);  // try again next tick
+  draw();                         // first render
+  if(state.user) loadChannels();  // kick-off data fetch
+}
+boot();   // launch the tiny poll-loop
+
 </script>
 <style>
   /* small utility so we don’t repeat Tailwind classes */
