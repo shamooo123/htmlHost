@@ -333,7 +333,6 @@ if (firstFile) {
         <video  src=${url}
         controls playsinline webkit-playsinline
         class="w-full h-full object-contain rounded bg-black"></video>
-        </video>
 
         <a href=${url} download
            class="text-xs text-indigo-600 underline block mt-1">
@@ -444,7 +443,7 @@ function msgComposer () {
    return html`
     <form @submit=${sendMsg}
           class="flex flex-col gap-2 border-t p-3 bg-gray-50
-                 fixed sm:static inset-x-0 bottom-0 z-20">
+                 fixed sm:static inset-x-0 bottom-0 z-20">`
 
       <!-- 🆕 reply-preview (hidden until state.replying is set) -->
       ${state.replying ? html`
