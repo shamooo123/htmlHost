@@ -6,44 +6,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 
 <!-- just above your <script type="module"> -->
-<style>
-.sqs-block-html > .sqs-block-content{
-  height:100%;          /* let it grow */
-  padding:0 !important; /* remove the default 20 px */
-}
-                             
-@media (max-width:639px){  /* mobile */
-  #pb-chat{ height:calc(100vh - 56px); }   /* 56 px mobile header */
-}
-                             
-@media (min-width:640px){  /* desktop */
-  #pb-chat{ height:calc(100vh - 122px); }  /* 122 px desktop header */
-}
 
-/* reply highlight when user taps a preview */
-@keyframes flash {from{background:#fef3c7;} to{background:transparent;}}
-
-article.flash{ animation:flash 1.2s; }
-
-
-
-
-                             
-</style>
-
-<style>
-/* ░░ 1-A  — let the Squarespace section give the iframe real estate ░░ */
-.sqs-block-html                {padding:0 !important;}
-
-/* ░░ 1-B  — chat host is always exactly the viewport minus header ░░ */
-#pb-chat{
-  height:calc(100vh - 122px);      /* desktop header */
-  width:100%;
-}
-@media (max-width:639px){          /* mobile */
-  #pb-chat{height:calc(100vh - 56px);}
-}
-</style>
 
 <!--  ==== COMMUNITY CHAT (PocketBase + Tailwind) ====  -->
 
@@ -53,7 +16,7 @@ article.flash{ animation:flash 1.2s; }
 <!-- Tailwind ─ loads instantly from the official CDN -->
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  /* 1) Let the iframe container be a flex column that fills 100% */
+  /* full-height flex container */
   html, body {
     height: 100%;
     margin: 0;
@@ -64,17 +27,17 @@ article.flash{ animation:flash 1.2s; }
     flex-direction: column;
     height: 100%;
     width: 100%;
-    overflow: hidden; /* child will scroll */
   }
 
-  /* 2) Make the messages area scrollable with bottom padding */
+  /* only the messages pane scrolls */
   #msgwrap {
-    flex: 1;              /* fill remaining space */
-    overflow-y: auto;     /* vertical scrolling */
-    padding-bottom: 4rem; /* leave room for the composer */
+    flex: 1;                  /* fill space between header & composer */
+    overflow-y: auto;         /* vertical scrolling */
+    -webkit-overflow-scrolling: touch; /* smooth on iOS */
+    padding-bottom: 4rem;     /* room for composer */
   }
 
-  /* 3) Keep the composer bar “stuck” at the bottom of #pb-chat */
+  /* composer sticks to bottom of that column */
   form[class*="fixed"] {
     position: sticky !important;
     bottom: 0 !important;
@@ -82,11 +45,12 @@ article.flash{ animation:flash 1.2s; }
     z-index: 20;
   }
 
-  /* tweak padding if your composer is taller on desktop */
+  /* if your composer is taller on desktop */
   @media (min-width: 640px) {
     #msgwrap { padding-bottom: 5rem; }
   }
 </style>
+
 
 
 <script type="module">
@@ -238,7 +202,7 @@ async function signupEmail(e){
 function chatUI () {
   return html`
   <!-- wrapper fills the #pb-chat DIV -->
-  <div class="flex flex-col w-full h-full bg-white border rounded overflow-hidden">
+  <div class="flex flex-col w-full h-full bg-white border rounded">
 
     <!-- ░░ CHANNEL BAR ░░ -->
     <nav class="shrink-0 flex items-center gap-2 px-3 py-2
