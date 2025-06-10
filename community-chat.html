@@ -7,15 +7,6 @@
 
 <!-- just above your <script type="module"> -->
 <style>
-@media (max-width:639px){       /*  < 640 px  =  Tailwind “sm” breakpoint */
-  html,body{ height:100%; overflow:hidden; }
-}
-
-@media (max-width:639px){      /* phone */
-  html,body,#pb-chat{height:100%;margin:0;overflow:hidden;}
-  #pb-chat{min-height:0;}
-}
-
 .sqs-block-html > .sqs-block-content{
   height:100%;          /* let it grow */
   padding:0 !important; /* remove the default 20 px */
@@ -34,8 +25,7 @@
 
 article.flash{ animation:flash 1.2s; }
 
-     /* force the chat block itself to be very tall   */
-#pb-chat{height:90vh !important;}   /* feel free to tweak 90 → 92-95 etc. */
+
 
 
                              
@@ -44,7 +34,6 @@ article.flash{ animation:flash 1.2s; }
 <style>
 /* ░░ 1-A  — let the Squarespace section give the iframe real estate ░░ */
 .sqs-block-html                {padding:0 !important;}
-.sqs-block-html > .sqs-block-content{height:100% !important;}
 
 /* ░░ 1-B  — chat host is always exactly the viewport minus header ░░ */
 #pb-chat{
@@ -63,6 +52,41 @@ article.flash{ animation:flash 1.2s; }
 
 <!-- Tailwind ─ loads instantly from the official CDN -->
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* 1) Let the iframe container be a flex column that fills 100% */
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  #pb-chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* child will scroll */
+  }
+
+  /* 2) Make the messages area scrollable with bottom padding */
+  #msgwrap {
+    flex: 1;              /* fill remaining space */
+    overflow-y: auto;     /* vertical scrolling */
+    padding-bottom: 4rem; /* leave room for the composer */
+  }
+
+  /* 3) Keep the composer bar “stuck” at the bottom of #pb-chat */
+  form[class*="fixed"] {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: white;
+    z-index: 20;
+  }
+
+  /* tweak padding if your composer is taller on desktop */
+  @media (min-width: 640px) {
+    #msgwrap { padding-bottom: 5rem; }
+  }
+</style>
 
 
 <script type="module">
