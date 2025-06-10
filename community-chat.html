@@ -218,12 +218,12 @@ function chatUI () {
 
     <!-- ░░ CHANNEL HEADER ░░ -->
     <header class="relative shrink-0 p-3 border-b bg-white font-semibold">
-     <!-- centered title -->
-     <span class="absolute inset-x-0 text-center">
+     <!-- centered title, now truly vertically centered -->
+     <span class="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
        ${state.current ? `#${state.current.name}` : "select a channel"}
      </span>
 
-     <!-- controls top-right -->
+          <!-- controls top-right -->
      <span class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-4">
        <button @click=${openSettings}
                class="px-3 py-1.5 text-sm text-indigo-600 rounded transition hover:bg-indigo-50 active:bg-indigo-100">
