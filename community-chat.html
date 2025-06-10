@@ -307,17 +307,22 @@ if (firstFile) {
   if (isVideo(firstFile)) {
     // video preview (plays in place, can go full-screen, plus download link)
     imageEl = html`
-      <div class="mt-2 max-w-xs max-h-60">
-        <video  src=${url}
-        controls playsinline webkit-playsinline
-        class="w-full h-full object-contain rounded bg-black"></video>
+        <div class="mt-2 max-w-xs overflow-hidden">
+          <video
+            src=${url}
+            controls playsinline webkit-playsinline
+            class="w-full rounded bg-black"
+          ></video>
 
-        <a href=${url} download
-           class="text-xs text-indigo-600 underline block mt-1">
-          ⬇︎ Download
-        </a>
-      </div>`;
-  } else {
+          <a
+            href=${url}
+            download
+            class="text-xs text-indigo-600 underline block mt-1"
+          >
+            ⬇︎ Download
+          </a>
+        </div>`;
+     } else {
     // plain image
     imageEl = html`
       <img src=${url}
