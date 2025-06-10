@@ -443,7 +443,7 @@ function msgComposer () {
    return html`
     <form @submit=${sendMsg}
           class="flex flex-col gap-2 border-t p-3 bg-gray-50
-                 fixed sm:static inset-x-0 bottom-0 z-20">`
+                 fixed sm:static inset-x-0 bottom-0 z-20">
 
       <!-- 🆕 reply-preview (hidden until state.replying is set) -->
       ${state.replying ? html`
