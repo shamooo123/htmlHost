@@ -1,1226 +1,756 @@
-<!--  ==== COMMUNITY CHAT (PocketBase + Tailwind) ====  -->
-<!-- just change this one line -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
+  <!-- Tailwind (only once!) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- Tailwind ─ loads instantly from the official CDN -->
-<script src="https://cdn.tailwindcss.com"></script>
-
-<!-- just above your <script type="module"> -->
-<style>
-.sqs-block-html > .sqs-block-content{
-  height:100%;          /* let it grow */
-  padding:0 !important; /* remove the default 20 px */
-}
-                             
-@media (max-width:639px){  /* mobile */
-  #pb-chat{ height:calc(100vh - 56px); }   /* 56 px mobile header */
-}
-                             
-@media (min-width:640px){  /* desktop */
-  #pb-chat{ height:calc(100vh - 122px); }  /* 122 px desktop header */
-}
-
-/* reply highlight when user taps a preview */
-@keyframes flash {from{background:#fef3c7;} to{background:transparent;}}
-
-article.flash{ animation:flash 1.2s; }
-
-
-
-
-                             
-</style>
-
-<style>
-/* ░░ 1-A  — let the Squarespace section give the iframe real estate ░░ */
-.sqs-block-html                {padding:0 !important;}
-
-/* ░░ 1-B  — chat host is always exactly the viewport minus header ░░ */
-#pb-chat{
-  height:calc(100vh - 122px);      /* desktop header */
-  width:100%;
-}
-@media (max-width:639px){          /* mobile */
-  #pb-chat{height:calc(100vh - 56px);}
-}
-</style>
-
-<!--  ==== COMMUNITY CHAT (PocketBase + Tailwind) ====  -->
-
-<!-- ▼ THIS LINE WAS MISSING -->
-<div id="pb-chat" class="w-full"></div>
-
-<!-- Tailwind ─ loads instantly from the official CDN -->
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  /* 1) Let the iframe container be a flex column that fills 100% */
-  html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-  }
-  #pb-chat {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
-    overflow: hidden; /* child will scroll */
-  }
-
-  /* 2) Make the messages area scrollable with bottom padding */
-  #msgwrap {
-    flex: 1;              /* fill remaining space */
-    overflow-y: auto;     /* vertical scrolling */
-    padding-bottom: 4rem; /* leave room for the composer */
-  }
-
-  /* 3) Keep the composer bar “stuck” at the bottom of #pb-chat */
-  form[class*="fixed"] {
-    position: sticky !important;
-    bottom: 0 !important;
-    background: white;
-    z-index: 20;
-  }
-
-  /* tweak padding if your composer is taller on desktop */
-  @media (min-width: 640px) {
-    #msgwrap { padding-bottom: 5rem; }
-  }
-</style>
-
-
-<script type="module">
- 
-
-/* ----------------------------------------------------
-   CONFIGURATION
----------------------------------------------------- */
-import PocketBase from "https://cdn.jsdelivr.net/npm/pocketbase/+esm";
-import { html, render } from "https://cdn.jsdelivr.net/npm/lit-html/+esm";
-
- /* tiny helper --------------------------- */
-const isVideo = f => /\.(mp4|webm|ogg|mov|mpeg|ogv|m4v|mkv)$/i.test(f||"");
-
-
-console.log("module executed");   // sanity check
-const PB_URL = "https://pocketbase-yxsc.onrender.com";          //  ← change me
-const pb = new PocketBase(PB_URL);
-
-/* 🆕 helper ---------------------------------------------------- */
-const byId   = id => document.getElementById(id);
-const msgDom = id => byId(`m-${id}`);           // <article id="m-⧸ID">
-
-     /* ------------- reply helpers ----------------------------- */
-function setReply(m){
-  setState({
-    replying:{
-      id        : m.id,
-      text      : m.text,
-      authorName: m.expand?.author?.displayName || "Unknown"
+  <!-- Consolidated CSS -->
+  <style>
+    /* Base viewport styles */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
     }
-  });
-  // focus the text box quickly
-  setTimeout(()=> byId("composerText")?.focus(),100);
-}
 
-function scrollToMsg(id,e){
-  e?.preventDefault();
-  const el = msgDom(id);
-  if(!el) return;
-  el.scrollIntoView({behavior:"smooth",block:"center"});
-  el.animate([{background:"#fef3c7"},{background:"transparent"}],
-             {duration:1200});
-}
-
-
-
-/* ⬇︎  add this */
-pb.autoCancellation(false);
-
-/* ----------------------------------------------------
-   STATE  /  SIMPLE STORE
----------------------------------------------------- */
-const state = {
-  user        : pb.authStore.model,
-  channels    : [],
-  current     : null,
-  messages    : [],
-  pinned      : [],
-  msgSub      : null,
-  showSidebar : true        // ← add here, nowhere else
-};
-
-
-
-const setState = (obj)=>{ Object.assign(state,obj); draw(); };
-
-/* ------- pin-banner helper state ------- */
-let pinTimer   = null;        // rotation interval
-let pinIndex   = 0;           // which pinned msg is showing
-let pinExpanded = false;      // banner is unfolded?
-
-
-/* ----------------------------------------------------
-   RENDER LOOP
----------------------------------------------------- */
-function draw(){ render(state.user ? chatUI() : authUI(),
-                        document.getElementById("pb-chat")); }
-
-/* ---------- AUTH SCREENS ---------- */
-function authUI(){
-  return html`
-  <div class="max-w-md mx-auto my-12 p-6 bg-white rounded-xl shadow">
-    <h2 class="text-xl font-semibold mb-4 text-center">Member Login</h2>
-    <form @submit=${loginEmail} class="space-y-3">
-      <input name="email"    type="email"    placeholder="Email"
-             required class="w-full p-2 border rounded">
-      <input name="password" type="password" placeholder="Password"
-             required class="w-full p-2 border rounded">
-      <button class="w-full py-2 bg-indigo-600 text-white rounded">Log&nbsp;in</button>
-    </form>
-    ${state.loginErr ? html`
-  <p class="mt-2 text-center text-red-600 text-sm">${state.loginErr}</p>` : ""}
-    <p class="text-sm text-center mt-4">
-      No account?
-      <a @click=${()=>setState({showSignup:true})}
-         class="text-indigo-600 cursor-pointer">Sign up</a>
-    </p>
-    ${state.showSignup ? signupForm() : ""}
-  </div>`; }
-
-function signupForm(){ return html`
-  <form @submit=${signupEmail} class="space-y-3 mt-4 border-t pt-4">
-   <input name="fullname" placeholder="Full name" required
-       class="w-full p-2 border rounded">
-    <input name="display"  placeholder="Display name" required
-           class="w-full p-2 border rounded">
-    <input name="email"    type="email"    placeholder="Email"    required
-           class="w-full p-2 border rounded">
-    <input name="password" type="password" placeholder="Password" required
-           class="w-full p-2 border rounded">
-    <button class="w-full py-2 bg-green-600 text-white rounded">
-      Create&nbsp;account
-    </button>
-  </form>`; }
-
-
-async function loginEmail(e){
-  e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target));
-  try{
-    await pb.collection("users").authWithPassword(f.email, f.password);
-    setState({ user: pb.authStore.model, showSignup:false, loginErr:null });
-    loadChannels();
-  }catch(err){
-    /* show a friendly message under the form */
-    setState({ loginErr:"Wrong e-mail or password" });
-  }
-}
-async function signupEmail(e){
-  e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target));   // collect all 4 values
-
-  await pb.collection("users").create({
-    email           : f.email,
-    password        : f.password,
-    passwordConfirm : f.password,
-    name            : f.fullname,     // real name (auth collection already has “name”)
-    displayName     : f.display,      // public nickname
-    role            : "member"
-  });
-
-  /* immediately log-in the new user */
-  await loginEmail({ preventDefault(){}, target:e.target });
-}
-
-
-/* ---------- CHAT SCREENS (channels on top, fully responsive) ---------- */
-function chatUI () {
-  return html`
-  <!-- wrapper fills the #pb-chat DIV -->
-  <div class="flex flex-col w-full h-full bg-white border rounded overflow-hidden">
-
-    <!-- ░░ CHANNEL BAR ░░ -->
-    <nav class="shrink-0 flex items-center gap-2 px-3 py-2
-                bg-gray-100 border-b overflow-x-auto">
-      ${state.channels.map(channelRow)}
-      ${isMod() ? html`
-        <button @click=${createChannel}
-                class="px-3 py-1 rounded-full shrink-0
-                       bg-indigo-50 text-indigo-600
-                       hover:bg-indigo-100 active:bg-indigo-200">
-          ＋
-        </button>` : ""}
-    </nav>
-
-    <!-- ░░ MAIN AREA ░░ -->
-    <main class="flex-1 flex flex-col">
-
-      <!-- header -->
-      <header class="shrink-0 p-3 border-b bg-white font-semibold flex justify-between">
-        <span>${state.current ? `#${state.current.name}` : "select a channel"}</span>
-
-        <span class="flex items-center gap-4">
-          <button @click=${openSettings}
-                  class="px-3 py-1.5 text-sm text-indigo-600 rounded
-                         transition hover:bg-indigo-50 active:bg-indigo-100">
-            ⚙︎ Settings
-          </button>
-          <button @click=${logout}
-                  class="px-3 py-1.5 text-sm text-red-600 rounded
-                         transition hover:bg-indigo-50 active:bg-indigo-100">
-            Log&nbsp;out
-          </button>
-        </span>
-      </header>
-
-      <!-- messages -->
-    <section id="msgwrap"
-         class="relative flex-1 min-h-0
-                p-4 pb-24 sm:pb-4
-                overflow-y-auto touch-pan-y
-                space-y-3 bg-white">
-
-
-
-
-
-        ${state.pinned.length ? html`
-          <div class="sticky top-0 z-10 border border-indigo-300 bg-indigo-50
-                      rounded-md px-3 py-1 text-sm cursor-pointer select-none
-                      overflow-hidden whitespace-nowrap text-ellipsis"
-               @click=${togglePinBanner}>
-            📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
-          </div>` : ""}
-
-        ${state.messages.filter(m => m.pinned).map(renderMsg)}
-        ${state.messages.filter(m => !m.pinned).map(renderMsg)}
-      </section>
-
-      <!-- composer or read-only notice -->
-     ${state.current && canPostToCurrent()
-  ? html`<div class="shrink-0 border-t">${msgComposer()}</div>`
-        : state.current ? html`
-            <p class="shrink-0 p-4 text-center text-sm text-gray-500 border-t">
-              Read-only channel. Only staff can post here.
-            </p>` : ""}
-    </main>
-  </div>`;
-}
-
-
-
-function renderMsg(m){
-  // full user record if expand is present; otherwise just the ID string
-  const user = m.expand?.author ?? m.author;
-  const you  = (typeof user === "object") && user.id === state.user.id;
-
-  /* ---------- avatar (image or initials) ---------- */
-let avatarEl;
-
-if (typeof user === "object" && user.avatar) {
-  // Auth-user files live under the internal bucket “_pb_users_auth_”
-  const avatarSrc =
-    `${PB_URL}/api/files/_pb_users_auth_/${user.id}/${user.avatar}?thumb=64x64`;
-
-  avatarEl = html`
-    <img class="w-10 h-10 rounded-full" src=${avatarSrc} alt="avatar">`;
-} else {
-  // fallback: grey circle with initials
-  const name      = typeof user === "object"
-                      ? user.displayName || user.email || "??"
-                      : "??";
-  const initials  = name.slice(0, 2).toUpperCase();
-
-  avatarEl = html`
-    <div class="w-10 h-10 rounded-full flex items-center justify-center
-                bg-gray-300 text-xs font-semibold">
-      ${initials}
-    </div>`;
-}
-
-  /* attached image (optional) */
-/* attached image OR video (optional) */
-const firstFile = Array.isArray(m.image) ? m.image[0] : m.image;
-
-let imageEl = "";
-if (firstFile) {
-  // build the public URL (works on every PB version)
-  const url = pb.files.getUrl
-            ? pb.files.getUrl(m, firstFile)     // PB ≥ 0.23
-            : pb.files.getURL(m, firstFile);    // PB ≤ 0.22
-
-  if (isVideo(firstFile)) {
-    // video preview (plays in place, can go full-screen, plus download link)
-    imageEl = html`
-      <div class="mt-2 max-w-xs max-h-60">
-        <video  src=${url}
-        controls playsinline webkit-playsinline
-        class="w-full h-full object-contain rounded bg-black"></video>
-
-        <a href=${url} download
-           class="text-xs text-indigo-600 underline block mt-1">
-          ⬇︎ Download
-        </a>
-      </div>`;
-  } else {
-    // plain image
-    imageEl = html`
-      <img src=${url}
-           class="max-w-xs rounded mt-2">`;
-  }
-}
-
-  /* ---------- role badge ---------- */
-let roleBadge = "";
-if (typeof user === "object") {
-  if (user.role === "admin") {
-    roleBadge = html`
-      <span class="ml-1 text-xs font-semibold text-green-600">
-        (ADMIN)
-      </span>`;
-  } else if (user.role === "moderator") {
-    roleBadge = html`
-      <span class="ml-1 text-xs font-semibold text-green-600">
-        (MOD)
-      </span>`;
-  }
-}
-
-
-  /* ---------- 🆕 build replyPreview (if any) ---------- */
-  let replyPreview = "";
-  if (m.expand?.replyTo) {
-    const r        = m.expand.replyTo;
-    const rName    = r.expand?.author?.displayName || "Unknown";
-    replyPreview = html`
-      <a @click=${e=>scrollToMsg(r.id,e)}
-         class="block border-l-2 border-indigo-400 pl-2 mb-1
-                text-xs cursor-pointer hover:bg-indigo-50">
-        <span class="font-semibold">${rName}</span>:
-        ${truncate(r.text || "[attachment]",60)}
-      </a>`;
-  }
-
-  /* ---------- template ---------- */
-  return html`
-
-  <article class="flex gap-3" id="m-${m.id}">
-    ${avatarEl}
-
-    <div class="flex-1">
-      <header class="text-sm mb-1">
-        <span class="font-semibold">
-          ${typeof user === "object"
-              ? user.displayName || user.email
-              : user       /* ← unlikely, but safe */}
-        </span>
-        ${roleBadge}
-
-        <time class="ml-2 text-gray-500 text-xs">
-           ${new Date(m.created).toLocaleString([], {
-       year:  'numeric',
-       month: '2-digit',
-       day:   '2-digit',
-       hour:  '2-digit',
-       minute:'2-digit'
-   })}
-        </time>
-
-        ${(isMod() || you)
-          ? html`<button @click=${()=>delMsg(m)}
-                   class="ml-2 text-red-600 text-xs">Delete🗑</button>` : ""}
-        ${isMod()
-          ? html`<button @click=${()=>pinMsg(m)}
-                   class="ml-2 text-xs">${m.pinned ? "Unpin📌" : "Pin📌"}</button>` : ""}
-          ${ state.current ? html`
-  <button @click=${()=>setReply(m)}
-          class="ml-2 text-xs text-indigo-600">Reply↩︎</button>` : "" }
-
-      </header>
-
-${replyPreview}
-
-
-      ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
-      ${imageEl}
-    </div>
-    
-  </article>`;
-}
-
-   
-
-  
-
-
-function canPostToCurrent(){
-  if(!state.current || !state.user) return false;
-  if(state.user.role === "admin" || state.user.role === "moderator") return true;
-  return !state.current.staffOnly;   // members need the flag to be OFF
-}
-
-
-
-/* ---------- composer with reply-preview + file-preview ---------- */
-function msgComposer () {
-   return html`
-    <form @submit=${sendMsg}
-          class="flex flex-col gap-2 border-t p-3 bg-gray-50
-                 fixed sm:static inset-x-0 bottom-0 z-20">
-
-      <!-- 🆕 reply-preview (hidden until state.replying is set) -->
-      ${state.replying ? html`
-  <div class="flex items-center gap-2 bg-indigo-50 px-2 py-1 rounded
-              cursor-pointer"
-       @click=${() => scrollToMsg(state.replying.id)}>
-    <span class="text-xs font-semibold text-indigo-600">
-      Reply&nbsp;to&nbsp;${state.replying.authorName}
-    </span>
-    <span class="flex-1 text-xs truncate">
-      ${truncate(state.replying.text || "[attachment]", 50)}
-    </span>
-    <button type="button"
-            @click=${() => setState({replying:null})}
-            class="text-indigo-600 text-xs">✕</button>
-  </div>` : ""}
-
-
-      <!-- file preview (image / video) -->
-      <div id="imgPreview" class="hidden flex items-center gap-2">
-        <img   id="imgThumb" class="w-16 h-16 rounded object-cover">
-        <span  id="imgName"  class="text-sm text-gray-700"></span>
-        <button type="button" @click=${clearImage}
-                class="text-red-600 text-xs">✕</button>
-      </div>
-
-      <div class="flex gap-3">
-        <!-- give the textbox an id for quick focus after choosing “Reply” -->
-        <input  id="composerText"
-                name="text"
-                placeholder="Message…"
-                autocomplete="off"
-                class="flex-1 p-2 border rounded">
-
-        <!-- hidden file input -->
-        <input  id="imgInput"
-                name="image"
-                type="file"
-                accept="image/*,video/*"
-                class="hidden"
-                @change=${showPreview} >
-
-        <!-- nicer paper-clip -->
-        <button type="button"
-                @click=${() => document.getElementById("imgInput").click()}
-                class="w-10 h-10 flex items-center justify-center
-                       rounded hover:bg-indigo-50 active:bg-indigo-100
-                       transition">
-          <!-- hero-icons outline paper-clip (24×24) -->
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none"
-               viewBox="0 0 24 24" stroke-width="1.5"
-               stroke="currentColor" class="size-6">
-            <path stroke-linecap="round" stroke-linejoin="round"
-                  d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
-          </svg>
-        </button>
-
-        <button class="px-4 py-2 bg-indigo-600 text-white rounded
-                       hover:bg-indigo-700 transition">
-          Send
-        </button>
-      </div>
-    </form>`;
-}
-
-
-
-/* ---------- ACTIONS ---------- */
-async function createChannel(){
-  const name = prompt("Channel name (no spaces)");
-  if(!name) return;
-  const chan = await pb.collection("channels")
-                       .create({ name, createdBy:state.user.id });
-  await refreshChannels(chan.id);
-}
-   
-function switchChannel(c){
- if (state.current?.id === c.id) return;   // already there
- if (typeof state.msgSub === "function") {         // stop SSE for old channel
-   state.msgSub(); 
- }
-  /* clear the view immediately for snappier feedback */
-  setState({ current:c, messages:[], pinned:[] });
-
-  /* then load the new channel’s history */
-  loadMessages(c.id);
-}
-
-   /* render ONE channel row  –  whole row is clickable,
-   but the ✎ / 🗑 icons stop the click bubbling */
-function channelRow (c) {
-  const active = c.id === state.current?.id;
-  const lock   = c.staffOnly ? "🔒 " : "";
-  return html`
-    <button @click=${() => switchChannel(c)}
-            class="
-              px-3 py-1 rounded-full shrink-0 transition
-              ${active
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white text-gray-800 hover:bg-indigo-50 active:bg-indigo-100'}
-            ">
-      ${lock}#${c.name}
-    </button>`;
-}
-
-
-
-async function renameChannel(chan){
-  const name = prompt("New channel name", chan.name);
-  if(!name || name === chan.name) return;
-  await pb.collection("channels").update(chan.id, { name });
-  await refreshChannels(chan.id);
-}
-
-async function deleteChannel(chan){
-  if(!confirm(`Delete #${chan.name}?  All its messages will be removed.`)) return;
-  await pb.collection("channels").delete(chan.id);
-
-  /* after deletion pick first remaining channel (if any) */
-  await refreshChannels(state.channels[0]?.id);
-}
-   
-/* ---- helper: show preview when a file is picked ---- */
-function showPreview(e){
-  const file = e.target.files[0];
-  if (!file) return clearImage();
-
-  const url = URL.createObjectURL(file);
-
-  if (file.type.startsWith("video/")){
-    imgThumb.replaceWith(
-      Object.assign(document.createElement("video"),{
-        id   : "imgThumb",
-        src  : url,
-        muted: true,
-        loop : true,
-        playsInline: true,
-        className  : "w-16 h-16 object-cover rounded"
-      }));
-  }else{
-    imgThumb.replaceWith(
-      Object.assign(document.createElement("img"),{
-        id   : "imgThumb",
-        src  : url,
-        className: "w-16 h-16 object-cover rounded"
-      }));
-  }
-
-  imgName.textContent = file.name;
-  imgPreview.classList.remove("hidden");
-}
-
-
-/* ---- helper: clear the chosen file ---- */
-function clearImage(){
-  const input = document.getElementById("imgInput");
-  input.value = "";          // reset <input type="file">
-  imgPreview.classList.add("hidden");
-}
-
-   /* ---- shorten long texts for the banner ---- */
-function truncate(str, max = 110) {
-  if (!str) return "";
-  return str.length > max ? str.slice(0, max) + "…" : str;
-}
-
-/* ---- toggle banner expansion ---- */
-function togglePinBanner() {
-  pinExpanded = !pinExpanded;
-  if (pinExpanded) {
-    // show modal with all pinned messages
-    showPinnedModal();
-  }
-}
-
-/* ---- modal viewer ---- */
-function showPinnedModal() {
-  /* back-drop */
-  const modal = document.createElement("div");
-  modal.className =
-    "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
-
-  /* white card ----------------------------------------------- */
-  const card = document.createElement("div");
-  card.className =
-    "bg-white rounded-xl max-h-[80vh] w-[90vw] max-w-lg p-4 overflow-y-auto";
-  modal.appendChild(card);
-
-  /* close btn */
-  const close = () => document.body.removeChild(modal);
-  card.innerHTML = `
-      <h2 class="text-lg font-semibold mb-4">Pinned messages</h2>
-      <div id="pinList" class="space-y-4"></div>
-      <button id="pinClose"
-              class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded
-                     mx-auto block">Close</button>`;
-  card.querySelector("#pinClose").onclick = close;
-
-  /* render the list with Lit ------------------------------- */
-  const listHost = card.querySelector("#pinList");
-  render(state.pinned.map(renderMsg), listHost);
-
-  /* mount */
-  document.body.appendChild(modal);
-}
-
-
-   
-/* ---------- send message with error handling ---------- */
-async function sendMsg(e){
-  e.preventDefault();
-  const fd = new FormData(e.target);          // create first
-  if (state.replying) fd.set("replyTo", state.replying.id);
-  fd.set("channel", state.current.id);
-  fd.set("author",  state.user.id);
-
-  // trim empty text and image
-  if (!fd.get("text").trim())              fd.delete("text");
-  if (!fd.get("image") || fd.get("image").size === 0) fd.delete("image");
-
-  try {
-      /*  create the stub record; we DON'T push it to the UI  */
-      await pb.collection("messages").create(fd);
-
-      /*  clear form + preview immediately  */
-      e.target.reset();
-      setState({replying:null});
-      clearImage();
-
-  } catch (err){
-      alert(err?.message || "Failed to send message.");   // validation, size, etc.
-      console.error(err);
-  }
-}
-   
-async function delMsg(m){ if(confirm("Delete message?"))
-  await pb.collection("messages").delete(m.id); }
-async function pinMsg(m){
-  await pb.collection("messages").update(m.id,{pinned:!m.pinned});
-}
-function logout(){
-  pb.authStore.clear();
-  setState({user:null,channels:[],current:null,messages:[]});
-}
-const isMod = ()=>["moderator","admin"].includes(state.user?.role);
-
-/* quick helper: refresh the channel list after any CRUD op */
-async function refreshChannels(selectId = null){
-  state.channels = await pb.collection("channels")
-                           .getFullList({ sort:"sortorder,name" });
-setState({});                       // re-render list first
-
-  if (selectId){
-    const hit = state.channels.find(c => c.id === selectId);
-    if (hit) switchChannel(hit);      // then actually switch
-  }
-}
-
-/* ---------- DATA LOADERS ---------- */
-async function loadChannels(){
-    const list = await pb.collection("channels")
-                       .getFullList({ sort:"sortorder,name" });
-  setState({channels:list});
-  if(list.length) switchChannel(list[0]);
-}
-   
-/* ----------------------------------------------------
-   fetch all messages for the selected channel,
-   normalise them, compute the pinned list,
-   then subscribe for realtime updates
----------------------------------------------------- */
-async function loadMessages(channelId){
-
-  /* 1️⃣  grab everything that already exists */
-  let list = await pb.collection("messages").getFullList({
-  filter : `channel='${channelId}'`,
-  expand : "author,replyTo,replyTo.author",   // ← add these
-  sort   : "-pinned,created"
-});
-
-
-  /* 2️⃣  legacy fix: replace “image” placeholders with the real filename */
-  await Promise.all(
-    list.map(async (m,i) => {
-      const needsFix =
-        m.image === "image" ||
-        (Array.isArray(m.image) && m.image[0] === "image");
-
-      if (needsFix) {
-        list[i] = await pb.collection("messages")
-                          .getOne(m.id, { expand:"author" });
-      }
-    })
-  );
-
-  /* 3️⃣  normalise: ensure m.image is a *single* filename string */
-  for (const m of list) {
-  /* 3a. turn 1-item array → plain string */
-  if (Array.isArray(m.image)) m.image = m.image[0] || "";
-
-  /* 3b. if replyTo is only an ID, fetch its record + author */
-  if (m.replyTo && typeof m.replyTo === "string") {
-    m.replyTo = await pb.collection("messages")
-                        .getOne(m.replyTo, { expand:"author" });
-  }
-}
-
-
-  /* 4️⃣  compute the pinned list and push everything into state */
-  const pinned = list
-    .filter(m => m.pinned)
-    .sort((a,b) => new Date(a.created) - new Date(b.created));
-
-  setState({ messages:list, pinned });
-
-  /* 5️⃣  (re)start the 3-second rotation of the banner */
-  startPinRotation();
-
-  /* 6️⃣  subscribe to realtime changes — **await** because the
-          fixed subscribeMessages is now async and returns a promise */
-  await subscribeMessages(channelId);
-
-  /* 7️⃣  scroll to the bottom once the DOM has rendered */
-  setTimeout(() => {
-    const wrap = document.getElementById("msgwrap");
-    if (wrap) wrap.scrollTop = wrap.scrollHeight;
-  }); 
- 
-  setTimeout(()=>document.getElementById("msgwrap").scrollTop = 9e9);
-}
-   
-/* ─────────────────────────────────────────────── */
-/* only ONE copy of this function in the file     */
-/* ─────────────────────────────────────────────── */
-async function subscribeMessages(channelId){
-  /* ❶ store the unsubscribe fn that .subscribe returns */
-  state.msgSub = await pb.collection("messages").subscribe(
-    "*",
-
-    /* ❷ realtime event-handler */
-    async ev => {
-      /* upsert helper ------------------------------ */
-      const upsert = rec => {
-        const i = state.messages.findIndex(x => x.id === rec.id);
-        i === -1 ? state.messages.push(rec)
-                 : state.messages[i] = rec;
-      };
-
-      /* CREATE ------------------------------------ */
-      if (ev.action === "create") {
-        let rec = ev.record;
-        if (!rec.image || rec.image === "image") {
-          rec = await pb.collection("messages")
-              .getOne(rec.id, { expand: "author,replyTo,replyTo.author" });
-
-        }
-        if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
-        upsert(rec);
-
-      /* UPDATE ------------------------------------ */
-      } else if (ev.action === "update") {
-        let rec = ev.record;
-        if (!rec.image || rec.image === "image") {
-          rec = await pb.collection("messages")
-              .getOne(rec.id, { expand: "author,replyTo,replyTo.author" });
-
-        }
-        if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
-        upsert(rec);
-
-      /* DELETE ------------------------------------ */
-      } else if (ev.action === "delete") {
-        state.messages = state.messages.filter(x => x.id !== ev.record.id);
-      }
-
-      /* recompute pinned -------------------------- */
-      state.pinned = state.messages
-        .filter(m => m.pinned)
-        .sort((a,b) => new Date(a.created) - new Date(b.created));
-      startPinRotation();
-
-      /* smart-scroll ------------------------------ */
-      const wrap     = document.getElementById("msgwrap");
-      const atBottom = wrap &&
-        (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
-
-      setState({ messages: state.messages, pinned: state.pinned });
-
-      if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
-    },
-
-    /* subscribe options */
-   {
-      filter : `channel='${channelId}'`,
-      // old:  expand : "author"
-      // new:  expand *both* the reply and its author
-      expand : "author,replyTo,replyTo.author"
+    /* Chat container */
+    #pb-chat {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
     }
-  );
-}
 
+    /* Message wrapper */
+    #msgwrap {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 4rem;
+    }
 
+    /* Composer positioning */
+    form[class*="fixed"] {
+      position: sticky !important;
+      bottom: 0 !important;
+      background: white;
+      z-index: 20;
+    }
 
-function startPinRotation() {
-  clearInterval(pinTimer);
-  if (state.pinned.length <= 1) return;
-  pinIndex = 0;
-  pinTimer = setInterval(() => {
-    pinIndex = (pinIndex + 1) % state.pinned.length;
-    draw();
-  }, 3000);
-}
+    /* Desktop adjustments */
+    @media (min-width: 640px) {
+      #msgwrap {
+        padding-bottom: 5rem;
+      }
+    }
 
- const isAdmin = () => state.user?.role === "admin";
+    /* Squarespace container adjustments */
+    .sqs-block-html > .sqs-block-content {
+      height: 100%;
+      padding: 0 !important;
+    }
+    .sqs-block-html {
+      padding: 0 !important;
+    }
 
-/* ───────── Settings dialog ───────── */
-/* ───────── Settings dialog ───────── */
-/* ───────── Settings dialog (now with channel management) ───────── */
-function openSettings () {
-  /* backdrop */
-  const modal = document.createElement("div");
-  modal.className =
-    "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
+    /* Reply animation */
+    @keyframes flash {
+      from { background: #fef3c7; }
+      to { background: transparent; }
+    }
+    article.flash { 
+      animation: flash 1.2s; 
+    }
 
-  /* current user & avatar url */
-  const me        = state.user;
-  const avatarURL = me.avatar
-      ? `${PB_URL}/api/files/_pb_users_auth_/${me.id}/${me.avatar}?thumb=128x128`
-      : "";
+    /* Mobile/Desktop headers */
+    @media (max-width: 639px) {
+      #pb-chat { 
+        height: calc(100vh - 56px); 
+      }
+    }
+    @media (min-width: 640px) {
+      #pb-chat { 
+        height: calc(100vh - 122px); 
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Chat mount point -->
+  <div id="pb-chat" class="w-full"></div>
 
-  /* build the modal ---------------------------------------------- */
-  modal.innerHTML = /*html*/`
-    <form id="setForm"
-       class="bg-white rounded-xl w-[90vw] max-w-lg p-6 space-y-6
-              max-h-[90vh] overflow-y-auto">
+  <!-- Module script with all chat functionality -->
+  <script type="module">
+    /* ----------------------------------------------------
+       CONFIGURATION
+    ---------------------------------------------------- */
+    import PocketBase from "https://cdn.jsdelivr.net/npm/pocketbase/+esm";
+    import { html, render } from "https://cdn.jsdelivr.net/npm/lit-html/+esm";
 
-      <h2 class="text-lg font-semibold text-center">Account settings</h2>
+    /* tiny helper --------------------------- */
+    const isVideo = f => /\.(mp4|webm|ogg|mov|mpeg|ogv|m4v|mkv)$/i.test(f||"");
 
-      <!-- ░░░░░░  PROFILE  ░░░░░░ -->
-      <section class="space-y-4">
-        <!-- avatar -->
-        <div class="flex items-center gap-4">
-          <img  id="setAvatarPrev" src="${avatarURL}"
-                class="w-16 h-16 rounded-full object-cover border" >
-          <label class="flex-1">
-            <span class="text-sm text-gray-600">Change avatar</span>
-            <input name="avatar" type="file" accept="image/*"
-                   class="mt-1 w-full" >
-          </label>
-        </div>
+    console.log("module executed");   // sanity check
+    const PB_URL = "https://pocketbase-yxsc.onrender.com";
+    const pb = new PocketBase(PB_URL);
 
-        <!-- display name -->
-        <label class="block">
-          <span class="text-sm text-gray-600">Display name</span>
-          <input name="displayName" value="${me.displayName||""}"
-                 class="mt-1 w-full p-2 border rounded" >
-        </label>
+    /* 🆕 helper ---------------------------------------------------- */
+    const byId   = id => document.getElementById(id);
+    const msgDom = id => byId(`m-${id}`);           // <article id="m-⧸ID">
 
-        <!-- password -->
-        <fieldset class="border-t pt-4 space-y-3">
-          <legend class="text-sm font-medium">Change password</legend>
-          <input name="oldPass"  type="password" placeholder="Current password"
-                 class="w-full p-2 border rounded" >
-          <input name="newPass"  type="password" placeholder="New password"
-                 class="w-full p-2 border rounded" >
-          <input name="newPass2" type="password" placeholder="Confirm new password"
-                 class="w-full p-2 border rounded" >
-        </fieldset>
-              …
-      </section>
+    /* ------------- reply helpers ----------------------------- */
+    function setReply(m){
+      setState({
+        replying:{
+          id        : m.id,
+          text      : m.text,
+          authorName: m.expand?.author?.displayName || "Unknown"
+        }
+      });
+      // focus the text box quickly
+      setTimeout(()=> byId("composerText")?.focus(),100);
+    }
 
-      <!-- ░░░░░░  CHANNELS (admins only)  ░░░░░░ -->
-      ${me.role === "admin" ? adminChannelSection() : ""}
+    function scrollToMsg(id,e){
+      e?.preventDefault();
+      const el = msgDom(id);
+      if(!el) return;
+      el.scrollIntoView({behavior:"smooth",block:"center"});
+      el.animate([{background:"#fef3c7"},{background:"transparent"}],
+                 {duration:1200});
+    }
 
-      <!-- feedback + buttons -->
-      <p id="setMsg" class="text-sm text-center text-red-600 hidden"></p>
+    /* ⬇︎ add this */
+    pb.autoCancellation(false);
 
-      <div class="flex justify-between pt-2">
-        <button type="button" id="setCancel"
-                class="px-4 py-2 rounded border">Cancel</button>
-        <button class="px-4 py-2 bg-indigo-600 text-white rounded">
-          Save
-        </button>
-      </div>
-    </form>`; 
-          // ⬅︎ this back-tick closes modal.innerHTML
-    /* ────── ↓ ALL the code below is pure JavaScript, NOT inside the template literal ────── */
-
-    /* ---------- mini row component (channel line) ---------- */
-    const row = c => /*html*/`
-      <div class="flex items-center gap-2 py-1">
-        <!-- staff-only toggle -->
-        <label class="flex items-center gap-1 cursor-pointer">
-          <input  type="checkbox"
-                  ${c.staffOnly ? "checked" : ""}
-                  onchange="toggleStaffOnly('${c.id}', this.checked)"
-                  class="accent-indigo-600">
-          <span class="text-xs select-none">staff-only</span>
-        </label>
-
-        <!-- sort-order number -->
-        <input  type="number" min="0" value="${c.sortorder ?? 0}"
-                onchange="setOrder('${c.id}', this.value)"
-                class="w-16 px-1 border rounded text-xs text-center">
-
-        <!-- editable channel name -->
-        <input  type="text" value="${c.name}"
-                onchange="renameChanInline('${c.id}', this.value)"
-                class="flex-1 px-1 border rounded text-sm">
-
-        <!-- delete button -->
-        <button onclick="deleteChanInline('${c.id}', '${c.name}')"
-                class="text-red-600 text-xs">🗑</button>
-      </div>`;
-
-    /* expose helper: change sortorder */
-    window.setOrder = async (id, val) => {
-      const n = parseInt(val, 10);
-      if (Number.isNaN(n) || n < 0) { alert("Order must be 0 or higher"); return; }
-      await pb.collection("channels").update(id, { sortorder: n });
-      await refreshChannels(id);            // re-fetch & redraw sidebar
+    /* ----------------------------------------------------
+       STATE / SIMPLE STORE
+    ---------------------------------------------------- */
+    const state = {
+      user        : pb.authStore.model,
+      channels    : [],
+      current     : null,
+      messages    : [],
+      pinned      : [],
+      msgSub      : null,
+      showSidebar : true
     };
 
-    /* live avatar preview ----------------------------------------------------- */
-    modal.querySelector('input[name="avatar"]').onchange = e=>{
-      const f = e.target.files[0];
-      if (f) modal.querySelector("#setAvatarPrev").src = URL.createObjectURL(f);
-    };
+    const setState = (obj)=>{ Object.assign(state,obj); draw(); };
 
+    /* ------- pin-banner helper state ------- */
+    let pinTimer   = null;        // rotation interval
+    let pinIndex   = 0;           // which pinned msg is showing
+    let pinExpanded = false;      // banner is unfolded?
 
-  /* buttons */
-  modal.querySelector("#setCancel").onclick = ()=>modal.remove();
-  modal.querySelector("#setForm").onsubmit   = saveSettings;
+    /* ----------------------------------------------------
+       RENDER LOOP
+    ---------------------------------------------------- */
+    function draw(){ render(state.user ? chatUI() : authUI(),
+                          document.getElementById("pb-chat")); }
 
-  document.body.appendChild(modal);
+    /* ---------- AUTH SCREENS ---------- */
+    function authUI(){
+      return html`
+      <div class="max-w-md mx-auto my-12 p-6 bg-white rounded-xl shadow">
+        <h2 class="text-xl font-semibold mb-4 text-center">Member Login</h2>
+        <form @submit=${loginEmail} class="space-y-3">
+          <input name="email"    type="email"    placeholder="Email"
+                 required class="w-full p-2 border rounded">
+          <input name="password" type="password" placeholder="Password"
+                 required class="w-full p-2 border rounded">
+          <button class="w-full py-2 bg-indigo-600 text-white rounded">Log&nbsp;in</button>
+        </form>
+        ${state.loginErr ? html`
+      <p class="mt-2 text-center text-red-600 text-sm">${state.loginErr}</p>` : ""}
+        <p class="text-sm text-center mt-4">
+          No account?
+          <a @click=${()=>setState({showSignup:true})}
+             class="text-indigo-600 cursor-pointer">Sign up</a>
+        </p>
+        ${state.showSignup ? signupForm() : ""}
+      </div>`; }
 
-  /* ---------- helpers just for this dialog ---------- */
- /* ---------- CHANNELS (admins only) ---------- */
-function adminChannelSection () {
+    function signupForm(){ return html`
+      <form @submit=${signupEmail} class="space-y-3 mt-4 border-t pt-4">
+       <input name="fullname" placeholder="Full name" required
+           class="w-full p-2 border rounded">
+        <input name="display"  placeholder="Display name" required
+               class="w-full p-2 border rounded">
+        <input name="email"    type="email"    placeholder="Email"    required
+               class="w-full p-2 border rounded">
+        <input name="password" type="password" placeholder="Password" required
+               class="w-full p-2 border rounded">
+        <button class="w-full py-2 bg-green-600 text-white rounded">
+          Create&nbsp;account
+        </button>
+      </form>`; }
 
-  /* one line in the list */
-  const row = c => /*html*/`
-    <div class="flex items-center gap-2 py-1">
-      <!-- staff-only -->
-      <label class="flex items-center gap-1 cursor-pointer">
-        <input  type="checkbox"
-                ${c.staffOnly ? "checked" : ""}
-                onchange="toggleStaffOnly('${c.id}', this.checked)"
-                class="accent-indigo-600">
-        <span class="text-xs select-none">staff-only</span>
-      </label>
-
-      <!-- order (NEW) -->
-      <input  type="number" min="0" value="${c.sortorder ?? 0}"
-              onchange="setOrder('${c.id}', this.value)"
-              class="w-16 px-1 border rounded text-xs text-center">
-
-      <!-- name -->
-      <input  type="text" value="${c.name}"
-              onchange="renameChanInline('${c.id}', this.value)"
-              class="flex-1 px-1 border rounded text-sm">
-
-      <!-- delete -->
-      <button onclick="deleteChanInline('${c.id}', '${c.name}')"
-              class="text-red-600 text-xs">🗑</button>
-    </div>`;
-
-  /* helpers exposed globally so inline onchange/onclick work */
-  window.toggleStaffOnly  = async (id,val)=>{
-    await pb.collection("channels").update(id,{staffOnly:val});
-    await refreshChannels(id);
-  };
-  window.renameChanInline = async (id, newName)=>{
-    if(!newName.trim()) return;
-    await pb.collection("channels").update(id,{name:newName.trim()});
-    await refreshChannels(id);
-  };
-  window.deleteChanInline = async (id,name)=>{
-    if(!confirm(`Delete #${name}?`)) return;
-    await pb.collection("channels").delete(id);
-    await refreshChannels(state.channels[0]?.id);
-  };
-  /* NEW: update order */
-  window.setOrder        = async (id,val)=>{
-    const n = parseInt(val,10);
-    if(Number.isNaN(n) || n < 0){ alert("Order must be 0 or higher"); return; }
-    await pb.collection("channels").update(id,{sortorder:n});
-    await refreshChannels(id);
-  };
-
-  /* assembled section */
-  return /*html*/`
-    <section class="border-t pt-4">
-      <h3 class="text-sm font-medium mb-2">Channels</h3>
-      <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
-        ${state.channels.map(row).join("")}
-      </div>
-      <button type="button" id="newChanBtn"
-              class="mt-2 text-indigo-600 text-sm">＋ New channel</button>
-    </section>`;
-}
-
-
-  /* inline “new channel” button inside admin section */
-  modal.querySelector("#newChanBtn")?.addEventListener("click", async ()=>{
-    const name = prompt("Channel name (no spaces)");
-    if(!name) return;
-    const rec = await pb.collection("channels")
-                        .create({ name, createdBy:me.id, staffOnly:false });
-    await refreshChannels(rec.id);
-    /* redraw section */
-    modal.remove();
-    openSettings();   // reopen to show fresh list
-  });
-}
-
-
-
-     
-
-
-/* ───────── saveSettings ───────── */
-/* ───────── saveSettings (with detailed password messages) ───────── */
-async function saveSettings(e){
-  e.preventDefault();
-  const form  = e.target;
-  const msgEl = form.querySelector("#setMsg");
-
-  /* reset feedback area */
-  msgEl.className = "text-sm text-center mt-2 hidden";
-  msgEl.textContent = "";
-
-  const fd = new FormData(form);
-
-  /* ---------- 1. avatar + display-name ------------------------------- */
-  if (fd.get("displayName") === state.user.displayName) fd.delete("displayName");
-  if (!fd.get("avatar") || fd.get("avatar").size === 0) fd.delete("avatar");
-
-  try{
-    if (fd.has("displayName") || fd.has("avatar")){
-      await pb.collection("users").update(state.user.id, fd);
-    }
-  }catch(err){
-    return showErr(err?.message || "Profile update failed.");
-  }
-
-  /* ---------- 2. password ------------------------------------------- */
-  const oldP = fd.get("oldPass"),
-        n1   = fd.get("newPass"),
-        n2   = fd.get("newPass2");
-
-  let pwdChanged = false;
-
-  if (oldP || n1 || n2){
-    /* client-side checks */
-    if (!oldP || !n1 || !n2){
-      return showErr("Fill in all three password boxes.");
-    }
-    if (n1 !== n2){
-      return showErr("New passwords don’t match — password not changed.");
+    async function loginEmail(e){
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      try{
+        await pb.collection("users").authWithPassword(f.email, f.password);
+        setState({ user: pb.authStore.model, showSignup:false, loginErr:null });
+        loadChannels();
+      }catch(err){
+        /* show a friendly message under the form */
+        setState({ loginErr:"Wrong e-mail or password" });
+      }
     }
 
-    /* server patch */
-    try{
-      await pb.collection("users").update(state.user.id,{
-        oldPassword     : oldP,
-        password        : n1,
-        passwordConfirm : n1
+    async function signupEmail(e){
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+
+      await pb.collection("users").create({
+        email           : f.email,
+        password        : f.password,
+        passwordConfirm : f.password,
+        name            : f.fullname,
+        displayName     : f.display,
+        role            : "member"
       });
 
-      /* re-login with NEW password so we get a fresh token */
-      await pb.collection("users").authWithPassword(state.user.email, n1);
-      pwdChanged = true;
-
-      /* blank the three inputs */
-      form.oldPass.value = form.newPass.value = form.newPass2.value = "";
-
-    }catch(err){
-      const msg =
-        err?.response?.data?.oldPassword?.message ? "Current password is wrong."
-        : err?.message || "Password change failed.";
-      return showErr(`${msg}  Password not changed.`);
+      /* immediately log-in the new user */
+      await loginEmail({ preventDefault(){}, target:e.target });
     }
-  }
 
-/* ---------- 3. refresh + live-update avatar + display-name ---------- */
-try{
-  await pb.collection("users").authRefresh();
+    /* ---------- CHAT SCREENS (channels on top, fully responsive) ---------- */
+    function chatUI () {
+      return html`
+      <!-- wrapper fills the #pb-chat DIV -->
+      <div class="flex flex-col w-full h-full bg-white border rounded overflow-hidden">
 
-  const me = pb.authStore.model;               // fresh copy of *you*
+        <!-- ░░ CHANNEL BAR ░░ -->
+        <nav class="shrink-0 flex items-center gap-2 px-3 py-2
+                    bg-gray-100 border-b overflow-x-auto">
+          ${state.channels.map(channelRow)}
+          ${isMod() ? html`
+            <button @click=${createChannel}
+                    class="px-3 py-1 rounded-full shrink-0
+                           bg-indigo-50 text-indigo-600
+                           hover:bg-indigo-100 active:bg-indigo-200">
+              ＋
+            </button>` : ""}
+        </nav>
 
-  /* patch every already-rendered message that belongs to me */
-  state.messages.forEach(m => {
-    const a = m.expand?.author;
-    if (a && a.id === me.id){
-      a.avatar      = me.avatar;
-      a.displayName = me.displayName;
+        <!-- ░░ MAIN AREA ░░ -->
+        <main class="flex-1 flex flex-col">
+          <!-- header -->
+          <header class="shrink-0 p-3 border-b bg-white font-semibold flex justify-between">
+            <span>${state.current ? `#${state.current.name}` : "select a channel"}</span>
+
+            <span class="flex items-center gap-4">
+              <button @click=${openSettings}
+                      class="px-3 py-1.5 text-sm text-indigo-600 rounded
+                             transition hover:bg-indigo-50 active:bg-indigo-100">
+                ⚙︎ Settings
+              </button>
+              <button @click=${logout}
+                      class="px-3 py-1.5 text-sm text-red-600 rounded
+                             transition hover:bg-indigo-50 active:bg-indigo-100">
+                Log&nbsp;out
+              </button>
+            </span>
+          </header>
+
+          <!-- messages -->
+          <section id="msgwrap"
+               class="relative flex-1 min-h-0
+                      p-4 pb-24 sm:pb-4
+                      overflow-y-auto touch-pan-y
+                      space-y-3 bg-white">
+
+            ${state.pinned.length ? html`
+              <div class="sticky top-0 z-10 border border-indigo-300 bg-indigo-50
+                          rounded-md px-3 py-1 text-sm cursor-pointer select-none
+                          overflow-hidden whitespace-nowrap text-ellipsis"
+                   @click=${togglePinBanner}>
+                📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
+              </div>` : ""}
+
+            ${state.messages.filter(m => m.pinned).map(renderMsg)}
+            ${state.messages.filter(m => !m.pinned).map(renderMsg)}
+          </section>
+
+          <!-- composer or read-only notice -->
+          ${state.current && canPostToCurrent()
+            ? html`<div class="shrink-0 border-t">${msgComposer()}</div>`
+            : state.current ? html`
+                <p class="shrink-0 p-4 text-center text-sm text-gray-500 border-t">
+                  Read-only channel. Only staff can post here.
+                </p>` : ""}
+        </main>
+      </div>`; }
+
+    function renderMsg(m){
+      // full user record if expand is present; otherwise just the ID string
+      const user = m.expand?.author ?? m.author;
+      const you  = (typeof user === "object") && user.id === state.user.id;
+
+      /* ---------- avatar (image or initials) ---------- */
+      let avatarEl;
+      if (typeof user === "object" && user.avatar) {
+        const avatarSrc = `${PB_URL}/api/files/_pb_users_auth_/${user.id}/${user.avatar}?thumb=64x64`;
+        avatarEl = html`<img class="w-10 h-10 rounded-full" src=${avatarSrc} alt="avatar">`;
+      } else {
+        const name = typeof user === "object" ? user.displayName || user.email || "??" : "??";
+        const initials = name.slice(0, 2).toUpperCase();
+        avatarEl = html`
+          <div class="w-10 h-10 rounded-full flex items-center justify-center
+                      bg-gray-300 text-xs font-semibold">
+            ${initials}
+          </div>`;
+      }
+
+      /* attached image OR video (optional) */
+      const firstFile = Array.isArray(m.image) ? m.image[0] : m.image;
+      let imageEl = "";
+      if (firstFile) {
+        const url = pb.files.getUrl ? pb.files.getUrl(m, firstFile) : pb.files.getURL(m, firstFile);
+        if (isVideo(firstFile)) {
+          imageEl = html`
+            <div class="mt-2 max-w-xs max-h-60">
+              <video src=${url}
+                     controls playsinline webkit-playsinline
+                     class="w-full h-full object-contain rounded bg-black"></video>
+              <a href=${url} download
+                 class="text-xs text-indigo-600 underline block mt-1">
+                ⬇︎ Download
+              </a>
+            </div>`;
+        } else {
+          imageEl = html`<img src=${url} class="max-w-xs rounded mt-2">`;
+        }
+      }
+
+      /* ---------- role badge ---------- */
+      let roleBadge = "";
+      if (typeof user === "object") {
+        if (user.role === "admin") {
+          roleBadge = html`
+            <span class="ml-1 text-xs font-semibold text-green-600">(ADMIN)</span>`;
+        } else if (user.role === "moderator") {
+          roleBadge = html`
+            <span class="ml-1 text-xs font-semibold text-green-600">(MOD)</span>`;
+        }
+      }
+
+      /* ---------- reply preview ---------- */
+      let replyPreview = "";
+      if (m.expand?.replyTo) {
+        const r = m.expand.replyTo;
+        const rName = r.expand?.author?.displayName || "Unknown";
+        replyPreview = html`
+          <a @click=${e=>scrollToMsg(r.id,e)}
+             class="block border-l-2 border-indigo-400 pl-2 mb-1
+                    text-xs cursor-pointer hover:bg-indigo-50">
+            <span class="font-semibold">${rName}</span>:
+            ${truncate(r.text || "[attachment]",60)}
+          </a>`;
+      }
+
+      /* ---------- message template ---------- */
+      return html`
+        <article class="flex gap-3" id="m-${m.id}">
+          ${avatarEl}
+          <div class="flex-1">
+            <header class="text-sm mb-1">
+              <span class="font-semibold">
+                ${typeof user === "object" ? user.displayName || user.email : user}
+              </span>
+              ${roleBadge}
+              <time class="ml-2 text-gray-500 text-xs">
+                ${new Date(m.created).toLocaleString([], {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute:'2-digit'
+                })}
+              </time>
+              ${(isMod() || you)
+                ? html`<button @click=${()=>delMsg(m)}
+                         class="ml-2 text-red-600 text-xs">Delete🗑</button>` : ""}
+              ${isMod()
+                ? html`<button @click=${()=>pinMsg(m)}
+                         class="ml-2 text-xs">${m.pinned ? "Unpin📌" : "Pin📌"}</button>` : ""}
+              ${state.current ? html`
+                <button @click=${()=>setReply(m)}
+                        class="ml-2 text-xs text-indigo-600">Reply↩︎</button>` : ""}
+            </header>
+            ${replyPreview}
+            ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
+            ${imageEl}
+          </div>
+        </article>`;
     }
-  });
 
-  /* ⬅︎ GIVE setState *new* references so Lit knows something changed */
-  setState({
-    user     : me,
-    messages : [...state.messages]   // <-- shallow copy = new ref
-  });
+    function canPostToCurrent(){
+      if(!state.current || !state.user) return false;
+      if(state.user.role === "admin" || state.user.role === "moderator") return true;
+      return !state.current.staffOnly;
+    }
 
-  msgEl.textContent = "Profile saved ✔︎";
-  msgEl.classList.add("text-green-600");
-  msgEl.classList.remove("hidden");
-  setTimeout(() => form.parentElement.remove(), 1200);
+    /* ---------- composer with reply-preview + file-preview ---------- */
+    function msgComposer () {
+      return html`
+        <form @submit=${sendMsg}
+              class="flex flex-col gap-2 border-t p-3 bg-gray-50
+                     fixed sm:static inset-x-0 bottom-0 z-20">
+          ${state.replying ? html`
+            <div class="flex items-center gap-2 bg-indigo-50 px-2 py-1 rounded
+                        cursor-pointer"
+                 @click=${() => scrollToMsg(state.replying.id)}>
+              <span class="text-xs font-semibold text-indigo-600">
+                Reply&nbsp;to&nbsp;${state.replying.authorName}
+              </span>
+              <span class="flex-1 text-xs truncate">
+                ${truncate(state.replying.text || "[attachment]", 50)}
+              </span>
+              <button type="button"
+                      @click=${() => setState({replying:null})}
+                      class="text-indigo-600 text-xs">✕</button>
+            </div>` : ""}
 
-}catch(err){
-  showErr("Profile saved, but session refresh failed — please log in again.");
-}
+          <!-- file preview (image / video) -->
+          <div id="imgPreview" class="hidden flex items-center gap-2">
+            <img   id="imgThumb" class="w-16 h-16 rounded object-cover">
+            <span  id="imgName"  class="text-sm text-gray-700"></span>
+            <button type="button" @click=${clearImage}
+                    class="text-red-600 text-xs">✕</button>
+          </div>
 
+          <div class="flex gap-3">
+            <input  id="composerText"
+                    name="text"
+                    placeholder="Message…"
+                    autocomplete="off"
+                    class="flex-1 p-2 border rounded">
 
+            <!-- hidden file input -->
+            <input  id="imgInput"
+                    name="image"
+                    type="file"
+                    accept="image/*,video/*"
+                    class="hidden"
+                    @change=${showPreview}>
 
-  /* ---------- success feedback & auto-close -------------------------- */
-  msgEl.textContent =
-    (pwdChanged ? "Password updated. " : "") + "Profile saved ✔︎";
-  msgEl.classList.remove("hidden");
-  msgEl.classList.add("text-green-600");
+            <!-- paper-clip button -->
+            <button type="button"
+                    @click=${() => document.getElementById("imgInput").click()}
+                    class="w-10 h-10 flex items-center justify-center
+                           rounded hover:bg-indigo-50 active:bg-indigo-100
+                           transition">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none"
+                   viewBox="0 0 24 24" stroke-width="1.5"
+                   stroke="currentColor" class="size-6">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+              </svg>
+            </button>
 
-  setTimeout(()=>form.parentElement.remove(), 1200);
+            <button class="px-4 py-2 bg-indigo-600 text-white rounded
+                           hover:bg-indigo-700 transition">
+              Send
+            </button>
+          </div>
+        </form>`;
+    }
 
-  /* ---------- local helper ------------------------------------------ */
-  function showErr(txt){
-    msgEl.textContent = txt;
-    msgEl.classList.remove("hidden");
-    msgEl.classList.add("text-red-600");
-  }
-}
+    /* ---------- ACTIONS ---------- */
+    async function createChannel(){
+      const name = prompt("Channel name (no spaces)");
+      if(!name) return;
+      const chan = await pb.collection("channels")
+                           .create({ name, createdBy:state.user.id });
+      await refreshChannels(chan.id);
+    }
 
+    function switchChannel(c){
+      if (state.current?.id === c.id) return;
+      if (typeof state.msgSub === "function") {
+        state.msgSub();
+      }
+      setState({ current:c, messages:[], pinned:[] });
+      loadMessages(c.id);
+    }
 
-/* ---------- INIT ---------- */
-/* ---- wait until #pb-chat is really in the page ---- */
-function boot(){
-  const host = document.getElementById('pb-chat');
-  if(!host) return requestAnimationFrame(boot);  // try again next tick
-  draw();                         // first render
-  if(state.user) loadChannels();  // kick-off data fetch
-}
-boot();   // launch the tiny poll-loop
+    function channelRow (c) {
+      const active = c.id === state.current?.id;
+      const lock = c.staffOnly ? "🔒 " : "";
+      return html`
+        <button @click=${() => switchChannel(c)}
+                class="px-3 py-1 rounded-full shrink-0 transition
+                       ${active
+                         ? 'bg-indigo-600 text-white'
+                         : 'bg-white text-gray-800 hover:bg-indigo-50 active:bg-indigo-100'}">
+          ${lock}#${c.name}
+        </button>`;
+    }
 
-</script>
-<style>
-  /* small utility so we don’t repeat Tailwind classes */
-  .btn-surface{
-    @apply rounded flex items-center justify-center
-           transition hover:bg-indigo-50 active:bg-indigo-100;
-  }
-  /* keeps invalid inputs red inside settings dialog */
-  #setForm input:invalid{ @apply border-red-500; }
-</style>
+    async function renameChannel(chan){
+      const name = prompt("New channel name", chan.name);
+      if(!name || name === chan.name) return;
+      await pb.collection("channels").update(chan.id, { name });
+      await refreshChannels(chan.id);
+    }
 
-<!--  ================================================  -->
+    async function deleteChannel(chan){
+      if(!confirm(`Delete #${chan.name}? All its messages will be removed.`)) return;
+      await pb.collection("channels").delete(chan.id);
+      await refreshChannels(state.channels[0]?.id);
+    }
+
+    function showPreview(e){
+      const file = e.target.files[0];
+      if (!file) return clearImage();
+
+      const url = URL.createObjectURL(file);
+      if (file.type.startsWith("video/")){
+        imgThumb.replaceWith(
+          Object.assign(document.createElement("video"),{
+            id: "imgThumb",
+            src: url,
+            muted: true,
+            loop: true,
+            playsInline: true,
+            className: "w-16 h-16 object-cover rounded"
+          }));
+      } else {
+        imgThumb.replaceWith(
+          Object.assign(document.createElement("img"),{
+            id: "imgThumb",
+            src: url,
+            className: "w-16 h-16 object-cover rounded"
+          }));
+      }
+
+      imgName.textContent = file.name;
+      imgPreview.classList.remove("hidden");
+    }
+
+    function clearImage(){
+      const input = document.getElementById("imgInput");
+      input.value = "";
+      imgPreview.classList.add("hidden");
+    }
+
+    function truncate(str, max = 110) {
+      if (!str) return "";
+      return str.length > max ? str.slice(0, max) + "…" : str;
+    }
+
+    function togglePinBanner() {
+      pinExpanded = !pinExpanded;
+      if (pinExpanded) {
+        showPinnedModal();
+      }
+    }
+
+    function showPinnedModal() {
+      const modal = document.createElement("div");
+      modal.className = "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
+
+      const card = document.createElement("div");
+      card.className = "bg-white rounded-xl max-h-[80vh] w-[90vw] max-w-lg p-4 overflow-y-auto";
+      modal.appendChild(card);
+
+      const close = () => document.body.removeChild(modal);
+      card.innerHTML = `
+        <h2 class="text-lg font-semibold mb-4">Pinned messages</h2>
+        <div id="pinList" class="space-y-4"></div>
+        <button id="pinClose"
+                class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded
+                       mx-auto block">Close</button>`;
+      card.querySelector("#pinClose").onclick = close;
+
+      const listHost = card.querySelector("#pinList");
+      render(state.pinned.map(renderMsg), listHost);
+
+      document.body.appendChild(modal);
+    }
+
+    async function sendMsg(e){
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      if (state.replying) fd.set("replyTo", state.replying.id);
+      fd.set("channel", state.current.id);
+      fd.set("author", state.user.id);
+
+      if (!fd.get("text").trim()) fd.delete("text");
+      if (!fd.get("image") || fd.get("image").size === 0) fd.delete("image");
+
+      try {
+        await pb.collection("messages").create(fd);
+        e.target.reset();
+        setState({replying:null});
+        clearImage();
+      } catch (err){
+        alert(err?.message || "Failed to send message.");
+        console.error(err);
+      }
+    }
+
+    async function delMsg(m){
+      if(confirm("Delete message?")) {
+        await pb.collection("messages").delete(m.id);
+      }
+    }
+
+    async function pinMsg(m){
+      await pb.collection("messages").update(m.id,{pinned:!m.pinned});
+    }
+
+    function logout(){
+      pb.authStore.clear();
+      setState({user:null,channels:[],current:null,messages:[]});
+    }
+
+    const isMod = ()=>["moderator","admin"].includes(state.user?.role);
+
+    async function refreshChannels(selectId = null){
+      state.channels = await pb.collection("channels")
+                             .getFullList({ sort:"sortorder,name" });
+      setState({});
+
+      if (selectId){
+        const hit = state.channels.find(c => c.id === selectId);
+        if (hit) switchChannel(hit);
+      }
+    }
+
+    async function loadChannels(){
+      const list = await pb.collection("channels")
+                         .getFullList({ sort:"sortorder,name" });
+      setState({channels:list});
+      if(list.length) switchChannel(list[0]);
+    }
+
+    async function loadMessages(channelId){
+      let list = await pb.collection("messages").getFullList({
+        filter: `channel='${channelId}'`,
+        expand: "author,replyTo,replyTo.author",
+        sort: "-pinned,created"
+      });
+
+      await Promise.all(
+        list.map(async (m,i) => {
+          const needsFix =
+            m.image === "image" ||
+            (Array.isArray(m.image) && m.image[0] === "image");
+
+          if (needsFix) {
+            list[i] = await pb.collection("messages")
+                             .getOne(m.id, { expand:"author" });
+          }
+        })
+      );
+
+      for (const m of list) {
+        if (Array.isArray(m.image)) m.image = m.image[0] || "";
+        if (m.replyTo && typeof m.replyTo === "string") {
+          m.replyTo = await pb.collection("messages")
+                             .getOne(m.replyTo, { expand:"author" });
+        }
+      }
+
+      const pinned = list
+        .filter(m => m.pinned)
+        .sort((a,b) => new Date(a.created) - new Date(b.created));
+
+      setState({ messages:list, pinned });
+      startPinRotation();
+      await subscribeMessages(channelId);
+
+      setTimeout(() => {
+        const wrap = document.getElementById("msgwrap");
+        if (wrap) wrap.scrollTop = wrap.scrollHeight;
+      });
+    }
+
+    async function subscribeMessages(channelId){
+      state.msgSub = await pb.collection("messages").subscribe(
+        "*",
+        async ev => {
+          const upsert = rec => {
+            const i = state.messages.findIndex(x => x.id === rec.id);
+            i === -1 ? state.messages.push(rec)
+                    : state.messages[i] = rec;
+          };
+
+          if (ev.action === "create" || ev.action === "update") {
+            let rec = ev.record;
+            if (!rec.image || rec.image === "image") {
+              rec = await pb.collection("messages")
+                  .getOne(rec.id, { expand: "author,replyTo,replyTo.author" });
+            }
+            if (Array.isArray(rec.image)) rec.image = rec.image[0] || "";
+            upsert(rec);
+          } else if (ev.action === "delete") {
+            state.messages = state.messages.filter(x => x.id !== ev.record.id);
+          }
+
+          state.pinned = state.messages
+            .filter(m => m.pinned)
+            .sort((a,b) => new Date(a.created) - new Date(b.created));
+          startPinRotation();
+
+          const wrap = document.getElementById("msgwrap");
+          const atBottom = wrap &&
+            (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40);
+
+          setState({ messages: state.messages, pinned: state.pinned });
+
+          if (atBottom && wrap) wrap.scrollTop = wrap.scrollHeight;
+        },
+        {
+          filter: `channel='${channelId}'`,
+          expand: "author,replyTo,replyTo.author"
+        }
+      );
+    }
+
+    function startPinRotation() {
+      clearInterval(pinTimer);
+      if (state.pinned.length <= 1) return;
+      pinIndex = 0;
+      pinTimer = setInterval(() => {
+        pinIndex = (pinIndex + 1) % state.pinned.length;
+        draw();
+      }, 3000);
+    }
+
+    const isAdmin = () => state.user?.role === "admin";
+
+    function openSettings () {
+      const modal = document.createElement("div");
+      modal.className = "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
+
+      const me = state.user;
+      const avatarURL = me.avatar
+          ? `${PB_URL}/api/files/_pb_users_auth_/${me.id}/${me.avatar}?thumb=128x128`
+          : "";
+
+      modal.innerHTML = /*html*/`
+        <form id="setForm"
+           class="bg-white rounded-xl w-[90vw] max-w-lg p-6 space-y-6
+                  max-h-[90vh] overflow-y-auto">
+          <h2 class="text-lg font-semibold text-center">Account settings</h2>
+          <section class="space-y-4">
+            <div class="flex items-center gap-4">
+              <img  id="setAvatarPrev" src="${avatarURL}"
+                    class="w-16 h-16 rounded-full object-cover border" >
+              <label class="flex-1">
+                <span class="text-sm text-gray-600">Change avatar</span>
+                <input name="avatar" type="file" accept="image/*"
+                       class="mt-1 w-full" >
+              </label>
+            </div>
+            <label class="block">
+              <span class="text-sm text-gray-600">Display name</span>
+              <input name="displayName" value="${me.displayName
