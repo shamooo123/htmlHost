@@ -201,74 +201,41 @@ async function signupEmail(e){
 /* ---------- CHAT SCREENS (channels on top, fully responsive) ---------- */
 function chatUI () {
   return html`
-  <!-- wrapper fills the #pb-chat DIV -->
   <div class="flex flex-col w-full h-full bg-white border rounded">
 
     <!-- ░░ CHANNEL BAR ░░ -->
     <nav class="shrink-0 flex items-center gap-2 px-3 py-2
                 bg-gray-100 border-b overflow-x-auto">
       ${state.channels.map(channelRow)}
-      ${isMod() ? html`
-        <button @click=${createChannel}
-                class="px-3 py-1 rounded-full shrink-0
-                       bg-indigo-50 text-indigo-600
-                       hover:bg-indigo-100 active:bg-indigo-200">
-          ＋
-        </button>` : ""}
+      ${isMod() ? html`<button …>＋</button>` : ""}
     </nav>
 
-    <!-- ░░ MAIN AREA ░░ -->
-    <main class="flex-1 flex flex-col">
+    <!-- ░░ CHANNEL HEADER ░░ -->
+    <header class="shrink-0 p-3 border-b bg-white font-semibold flex justify-between">
+      <span>${state.current ? `#${state.current.name}` : "select a channel"}</span>
+      <span class="flex items-center gap-4">
+        <button @click=${openSettings} …>⚙︎ Settings</button>
+        <button @click=${logout} …>Log out</button>
+      </span>
+    </header>
 
-      <!-- header -->
-      <header class="shrink-0 p-3 border-b bg-white font-semibold flex justify-between">
-        <span>${state.current ? `#${state.current.name}` : "select a channel"}</span>
-
-        <span class="flex items-center gap-4">
-          <button @click=${openSettings}
-                  class="px-3 py-1.5 text-sm text-indigo-600 rounded
-                         transition hover:bg-indigo-50 active:bg-indigo-100">
-            ⚙︎ Settings
-          </button>
-          <button @click=${logout}
-                  class="px-3 py-1.5 text-sm text-red-600 rounded
-                         transition hover:bg-indigo-50 active:bg-indigo-100">
-            Log&nbsp;out
-          </button>
-        </span>
-      </header>
-
-      <!-- messages -->
+    <!-- ░░ SCROLLABLE MESSAGES ░░ -->
     <section id="msgwrap"
-         class="relative flex-1 min-h-0
-                p-4 pb-24 sm:pb-4
-                overflow-y-auto touch-pan-y
-                space-y-3 bg-white">
+         class="flex-1 p-4 overflow-y-auto touch-pan-y space-y-3 bg-white">
+      ${state.pinned.length ? html`
+        <div class="sticky top-0 z-10 …">📌 …</div>` : ""}
 
+      ${state.messages.filter(m=>m.pinned).map(renderMsg)}
+      ${state.messages.filter(m=>!m.pinned).map(renderMsg)}
+    </section>
 
-
-
-
-        ${state.pinned.length ? html`
-          <div class="sticky top-0 z-10 border border-indigo-300 bg-indigo-50
-                      rounded-md px-3 py-1 text-sm cursor-pointer select-none
-                      overflow-hidden whitespace-nowrap text-ellipsis"
-               @click=${togglePinBanner}>
-            📌 ${truncate(state.pinned[pinIndex]?.text || "[image]")}
-          </div>` : ""}
-
-        ${state.messages.filter(m => m.pinned).map(renderMsg)}
-        ${state.messages.filter(m => !m.pinned).map(renderMsg)}
-      </section>
-
-      <!-- composer or read-only notice -->
-     ${state.current && canPostToCurrent()
-  ? html`<div class="shrink-0 border-t">${msgComposer()}</div>`
-        : state.current ? html`
-            <p class="shrink-0 p-4 text-center text-sm text-gray-500 border-t">
-              Read-only channel. Only staff can post here.
-            </p>` : ""}
-    </main>
+    <!-- ░░ ALWAYS-VISIBLE COMPOSER ░░ -->
+    ${state.current && canPostToCurrent()
+      ? html`<div class="shrink-0 border-t">${msgComposer()}</div>`
+      : state.current ? html`
+        <p class="shrink-0 p-4 text-center text-sm text-gray-500 border-t">
+          Read-only channel. Only staff can post here.
+        </p>` : ""}
   </div>`;
 }
 
