@@ -61,6 +61,7 @@
 ---------------------------------------------------- */
 import PocketBase from "https://cdn.jsdelivr.net/npm/pocketbase/+esm";
 import { html, render } from "https://cdn.jsdelivr.net/npm/lit-html/+esm";
+import { unsafeHTML } from "https://cdn.jsdelivr.net/npm/lit-html/directives/unsafe-html.js/+esm";
 
  /* tiny helper --------------------------- */
 const isVideo = f => /\.(mp4|webm|ogg|mov|mpeg|ogv|m4v|mkv)$/i.test(f||"");
@@ -264,6 +265,48 @@ function chatUI () {
 }
 
 
+/* —— Safe HTML escaping —— */
+function escapeHTML(str=""){
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/* —— Linkify: supports [label](url) and bare URLs —— */
+function linkify(raw=""){
+  // 1) Escape all HTML first
+  let txt = escapeHTML(raw);
+
+  // 2) Markdown-style links: [label](https://example.com)
+  //    Keep it conservative: no nested [](), no spaces inside ()
+  txt = txt.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (m, label, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${escapeHTML(label)}</a>`
+  );
+
+  // 3) Bare URLs starting with http(s)://
+  txt = txt.replace(
+    /\bhttps?:\/\/[^\s<>"']+/g,
+    (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+  );
+
+  // 4) Bare www. links (prepend https://)
+  txt = txt.replace(
+    /(^|[\s(])www\.[^\s<>"']+/g,
+    (m) => {
+      const lead = m[0].match(/^\s|\($/) ? m[0][0] : "";
+      const url  = m.trim();
+      const full = `https://${url}`;
+      return `${lead}<a href="${full}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+    }
+  );
+
+  // 5) Preserve newlines: your <p> already uses whitespace-pre-wrap, so no <br> needed.
+  return txt;
+}
 
 
 function renderMsg(m){
@@ -395,7 +438,10 @@ if (typeof user === "object") {
 ${replyPreview}
 
 
-      ${m.text ? html`<p class="whitespace-pre-wrap">${m.text}</p>` : ""}
+      ${m.text ? html`
+  <p class="whitespace-pre-wrap">
+    ${unsafeHTML(linkify(m.text))}
+  </p>` : ""}
       ${imageEl}
     </div>
     
@@ -1174,6 +1220,10 @@ boot();   // launch the tiny poll-loop
   }
   /* keeps invalid inputs red inside settings dialog */
   #setForm input:invalid{ @apply border-red-500; }
+
+  #pb-chat a { text-decoration: underline; }
+  #pb-chat a:hover { text-decoration: none; }
 </style>
 
 <!--  ================================================  -->
+
